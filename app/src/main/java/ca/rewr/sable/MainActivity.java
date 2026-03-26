@@ -25,8 +25,15 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
 import android.webkit.CookieManager;
+
+import java.util.concurrent.TimeUnit;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -78,6 +85,9 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webview);
         setupWebView();
         webView.loadUrl(SABLE_URL);
+
+        // Schedule background sync every 15 minutes
+        scheduleBackgroundSync();
 
         // Request permissions
         List<String> perms = new ArrayList<>();
@@ -193,6 +203,20 @@ public class MainActivity extends AppCompatActivity {
         String imageFileName = "JPEG_" + timestamp + "_";
         File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         return File.createTempFile(imageFileName, ".jpg", storageDir);
+    }
+
+    private void scheduleBackgroundSync() {
+        Constraints constraints = new Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build();
+        PeriodicWorkRequest syncRequest = new PeriodicWorkRequest.Builder(
+                SyncWorker.class, 15, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .build();
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "sable_sync",
+            ExistingPeriodicWorkPolicy.KEEP,
+            syncRequest);
     }
 
     @Override

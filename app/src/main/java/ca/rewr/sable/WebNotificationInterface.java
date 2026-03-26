@@ -3,17 +3,14 @@ package ca.rewr.sable;
 import android.content.Context;
 import android.webkit.JavascriptInterface;
 
-/**
- * JavaScript bridge injected as window.AndroidNotifications.
- * Sable's Web Notification calls are intercepted by the JS shim
- * which forwards them here.
- */
 public class WebNotificationInterface {
 
     private final NotificationHelper helper;
+    private final TokenStore tokenStore;
 
     public WebNotificationInterface(Context context) {
         this.helper = new NotificationHelper(context);
+        this.tokenStore = new TokenStore(context);
     }
 
     @JavascriptInterface
@@ -27,5 +24,13 @@ public class WebNotificationInterface {
     @JavascriptInterface
     public void closeNotification(String tag) {
         if (tag != null) helper.clearNotification(tag);
+    }
+
+    /** Called from the JS shim when it detects a Matrix access token in localStorage */
+    @JavascriptInterface
+    public void saveSession(String accessToken, String homeserver) {
+        if (accessToken != null && !accessToken.isEmpty()) {
+            tokenStore.saveSession(accessToken, homeserver != null ? homeserver : "https://matrix.rewr.ca");
+        }
     }
 }
