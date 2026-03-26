@@ -2,7 +2,6 @@ package ca.rewr.sable;
 
 import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,7 +10,6 @@ import android.provider.MediaStore;
 import android.view.KeyEvent;
 import android.webkit.ConsoleMessage;
 import android.webkit.GeolocationPermissions;
-import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -19,13 +17,14 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.CookieManager;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
-import android.webkit.CookieManager;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -33,9 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
@@ -46,15 +43,14 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraImageUri;
     private String notificationShimJs;
+    private String pendingRoomId;
 
     private final ActivityResultLauncher<Intent> fileChooserLauncher =
         registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             Uri[] results = null;
             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
                 String dataString = result.getData().getDataString();
-                if (dataString != null) {
-                    results = new Uri[]{Uri.parse(dataString)};
-                }
+                if (dataString != null) results = new Uri[]{Uri.parse(dataString)};
             } else if (cameraImageUri != null) {
                 results = new Uri[]{cameraImageUri};
             }
@@ -76,22 +72,34 @@ public class MainActivity extends AppCompatActivity {
 
         webView = findViewById(R.id.webview);
         setupWebView();
-        webView.loadUrl(SABLE_URL);
 
-        // Navigate to room if opened from notification
-        handleNotificationIntent(getIntent());
+        // Check if launched from notification
+        String roomId = getIntent() != null ? getIntent().getStringExtra("room_id") : null;
+        if (roomId != null) {
+            // Load directly to the room URL
+            webView.loadUrl(SABLE_URL + "/#/room/" + roomId);
+        } else {
+            webView.loadUrl(SABLE_URL);
+        }
 
-        // Start persistent sync service for instant notifications
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
 
-        // Request permissions
-        List<String> perms = new ArrayList<>();
-        perms.add(Manifest.permission.CAMERA);
-        perms.add(Manifest.permission.RECORD_AUDIO);
+        // Only request notification permission upfront — mic/storage requested on demand
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            perms.add(Manifest.permission.POST_NOTIFICATIONS);
+            permissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
         }
-        permissionLauncher.launch(perms.toArray(new String[0]));
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent == null) return;
+        String roomId = intent.getStringExtra("room_id");
+        if (roomId == null) return;
+
+        // App already open — navigate directly
+        String url = SABLE_URL + "/#/room/" + roomId;
+        webView.loadUrl(url);
     }
 
     private void setupWebView() {
@@ -107,33 +115,25 @@ public class MainActivity extends AppCompatActivity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setUserAgentString(settings.getUserAgentString() + " RewrChat/1.0");
 
-        // Persist cookies and storage across sessions
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
-        // Inject notification bridge
         webView.addJavascriptInterface(new WebNotificationInterface(this), "AndroidNotifications");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
-                // Keep all rewr.ca and rewr.chat domains in the WebView (covers SSO/MAS flows)
-                if (url.contains("rewr.ca") || url.contains("rewr.chat")) {
-                    return false;
-                }
-                // Open everything else in the system browser
+                if (url.contains("rewr.ca") || url.contains("rewr.chat")) return false;
                 try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                    startActivity(intent);
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                 } catch (Exception ignored) {}
                 return true;
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                // Inject the notification shim after page load
                 if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
                     view.evaluateJavascript(notificationShimJs, null);
                 }
@@ -143,6 +143,25 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
+                // Request mic permission on demand when WebRTC needs it
+                boolean needsMic = false;
+                for (String res : request.getResources()) {
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(res)) {
+                        needsMic = true;
+                        break;
+                    }
+                }
+                if (needsMic && ContextCompat.checkSelfPermission(
+                        MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    permissionLauncher.launch(new String[]{Manifest.permission.RECORD_AUDIO});
+                    // Grant anyway — WebView will handle denial internally
+                }
+                if (ContextCompat.checkSelfPermission(
+                        MainActivity.this, Manifest.permission.CAMERA)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    permissionLauncher.launch(new String[]{Manifest.permission.CAMERA});
+                }
                 request.grant(request.getResources());
             }
 
@@ -184,9 +203,7 @@ public class MainActivity extends AppCompatActivity {
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
             StringBuilder sb = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append('\n');
-            }
+            while ((line = reader.readLine()) != null) sb.append(line).append('\n');
             return sb.toString();
         } catch (IOException e) {
             return "";
@@ -195,9 +212,8 @@ public class MainActivity extends AppCompatActivity {
 
     private File createImageFile() throws IOException {
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-        String imageFileName = "JPEG_" + timestamp + "_";
         File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        return File.createTempFile(imageFileName, ".jpg", storageDir);
+        return File.createTempFile("JPEG_" + timestamp + "_", ".jpg", storageDir);
     }
 
     @Override
@@ -216,52 +232,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         webView.restoreState(savedInstanceState);
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        handleNotificationIntent(intent);
-    }
-
-    private void handleNotificationIntent(Intent intent) {
-        if (intent == null) return;
-        final String roomId = intent.getStringExtra("room_id");
-        if (roomId == null || roomId.isEmpty()) return;
-
-        // Inject into page load — fires after Sable has mounted
-        webView.setWebViewClient(new android.webkit.WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(android.webkit.WebView view,
-                    android.webkit.WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                if (url.contains("rewr.ca") || url.contains("rewr.chat")) return false;
-                try { startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))); }
-                catch (Exception ignored) {}
-                return true;
-            }
-
-            @Override
-            public void onPageFinished(android.webkit.WebView view, String url) {
-                // Inject notification shim
-                if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
-                    view.evaluateJavascript(notificationShimJs, null);
-                }
-                // Navigate to room after React mounts (poll until hash changes)
-                String safeRoomId = roomId.replace("'", "\\'");
-                String js = "(function tryNav(attempts) {" +
-                    "  if (attempts <= 0) return;" +
-                    "  try {" +
-                    "    window.location.hash = '/room/" + safeRoomId + "';" +
-                    "  } catch(e) {}" +
-                    "  setTimeout(function(){ tryNav(attempts - 1); }, 800);" +
-                    "})(5);";
-                view.postDelayed(() -> view.evaluateJavascript(js, null), 1000);
-
-                // Restore normal WebViewClient after first load
-                setupWebView();
-            }
-        });
     }
 
     @Override
