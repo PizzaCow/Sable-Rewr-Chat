@@ -26,6 +26,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
+import android.webkit.CookieManager;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -99,6 +101,11 @@ public class MainActivity extends AppCompatActivity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setUserAgentString(settings.getUserAgentString() + " SableAndroid/1.0");
+
+        // Persist cookies and storage across sessions
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        cookieManager.setAcceptThirdPartyCookies(webView, true);
 
         // Inject notification bridge
         webView.addJavascriptInterface(new WebNotificationInterface(this), "AndroidNotifications");
@@ -182,6 +189,24 @@ public class MainActivity extends AppCompatActivity {
         String imageFileName = "JPEG_" + timestamp + "_";
         File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         return File.createTempFile(imageFileName, ".jpg", storageDir);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        webView.saveState(outState);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        webView.restoreState(savedInstanceState);
     }
 
     @Override
