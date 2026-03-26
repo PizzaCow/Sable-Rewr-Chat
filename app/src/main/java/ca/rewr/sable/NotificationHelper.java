@@ -88,7 +88,7 @@ public class NotificationHelper {
         // Only alert on individual notifications, not the summary
         builder.setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
 
-        // Group summary
+        // Group summary — use latest sender's avatar so it shows when collapsed
         NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setGroup(GROUP_KEY)
@@ -96,6 +96,10 @@ public class NotificationHelper {
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_LOW);
+
+        if (roundedAvatar != null) {
+            summary.setLargeIcon(roundedAvatar);
+        }
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
