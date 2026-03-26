@@ -7,8 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 
-import android.graphics.Color;
-
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
@@ -82,15 +80,20 @@ public class NotificationHelper {
             .setGroup(GROUP_KEY)
             .setNumber(1);
 
+        // Set large icon so it shows in collapsed single-notification view
         if (roundedAvatar != null) {
             builder.setLargeIcon(roundedAvatar);
         }
 
-        // Group summary (required for bundling on Android 7+)
+        // Only alert on individual notifications, not the summary
+        builder.setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
+
+        // Group summary
         NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setGroup(GROUP_KEY)
             .setGroupSummary(true)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_LOW);
 
