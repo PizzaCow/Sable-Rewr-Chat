@@ -105,15 +105,22 @@ public class MainActivity extends AppCompatActivity {
         if (intent == null) return;
         String roomId = intent.getStringExtra("room_id");
         if (roomId == null) return;
-        // App already open — navigate via JS hash, no reload
-        navigateToRoom(roomId);
+        boolean isDm = intent.getBooleanExtra("is_dm", false);
+        navigateToRoom(roomId, isDm);
     }
 
-    private void navigateToRoom(String roomId) {
+    private void navigateToRoom(String roomId, boolean isDm) {
         currentRoomId = roomId;
-        String safe = roomId.replace("\\", "\\\\").replace("'", "\\'");
-        webView.evaluateJavascript(
-            "window.location.hash = '/room/" + safe + "';", null);
+        try {
+            // Sable paths: /direct/:encodedRoomId/ for DMs, /home/:encodedRoomId/ for rooms
+            String encoded = java.net.URLEncoder.encode(roomId, "UTF-8");
+            String path = isDm ? "/direct/" + encoded + "/" : "/home/" + encoded + "/";
+            String safe = path.replace("\\", "\\\\").replace("'", "\\'");
+            webView.evaluateJavascript("window.location.hash = '" + safe + "';", null);
+        } catch (Exception e) {
+            // fallback
+            webView.evaluateJavascript("window.location.hash = '/home/" + roomId + "/';", null);
+        }
     }
 
     private void setupWebView() {
@@ -156,9 +163,10 @@ public class MainActivity extends AppCompatActivity {
                 if (launchIntent != null) {
                     String roomId = launchIntent.getStringExtra("room_id");
                     if (roomId != null) {
+                        boolean isDm = launchIntent.getBooleanExtra("is_dm", false);
                         // Delay for React to mount
-                        view.postDelayed(() -> navigateToRoom(roomId), 1200);
-                        launchIntent.removeExtra("room_id"); // only do this once
+                        view.postDelayed(() -> navigateToRoom(roomId, isDm), 1500);
+                        launchIntent.removeExtra("room_id");
                     }
                 }
             }
