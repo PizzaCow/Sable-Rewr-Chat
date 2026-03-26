@@ -121,16 +121,19 @@ public class MainActivity extends AppCompatActivity {
     private void navigateToRoom(String roomId, boolean isDm) {
         currentRoomId = roomId;
         if (!pageReady) {
-            // Page not ready yet — queue it
             pendingNavigationRoomId = roomId;
             pendingNavigationIsDm = isDm;
             return;
         }
-        String pathPrefix = isDm ? "/direct/" : "/home/";
+        // Use Sable's built-in /to/:user_id/:room_id/ deep-link route
+        // This is what the service worker uses and is the correct way to navigate
+        String ownUserId = new TokenStore(this).getOwnUserId();
         String safeRoomId = roomId.replace("\\", "\\\\").replace("'", "\\'");
+        String safeUserId = ownUserId.replace("\\", "\\\\").replace("'", "\\'");
         String js = "(function() {" +
-            "  var encoded = encodeURIComponent('" + safeRoomId + "');" +
-            "  window.location.hash = '" + pathPrefix + "' + encoded + '/';" +
+            "  var roomId = encodeURIComponent('" + safeRoomId + "');" +
+            "  var userId = encodeURIComponent('" + safeUserId + "');" +
+            "  window.location.hash = '/to/' + userId + '/' + roomId + '/';" +
             "})();";
         webView.evaluateJavascript(js, null);
     }
