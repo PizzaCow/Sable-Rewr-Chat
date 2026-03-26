@@ -41,5 +41,5 @@ jobs:
           tag_name: latest
           name: Latest Build
           body: "Latest debug build from main branch."
-          prerelease: true
+          prerelease: false
           files: sable-android.apk
