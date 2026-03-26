@@ -223,6 +223,10 @@ public class SyncService extends Service {
                 android.graphics.Bitmap senderAvatar = profileCache.getAvatar(senderFull);
                 android.graphics.Bitmap roomAvatar = profileCache.getRoomAvatar(roomId);
 
+                Log.d(TAG, "Notif: room=" + roomName + " sender=" + displayName
+                    + " senderAvatar=" + (senderAvatar != null ? "yes" : "null")
+                    + " roomAvatar=" + (roomAvatar != null ? "yes" : "null"));
+
                 notifHelper.showMessage(roomId, roomName, displayName, senderAvatar, roomAvatar,
                     body != null ? body : "New message", isEncrypted);
                 break; // One notif per room per sync

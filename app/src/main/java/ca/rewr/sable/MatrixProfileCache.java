@@ -172,13 +172,12 @@ public class MatrixProfileCache {
             String url = tokenStore.getHomeserver()
                 + "/_matrix/client/v3/profile/" + encode(userId) + "/avatar_url";
             JSONObject res = getJson(url);
-            if (res == null) return null;
+            if (res == null) { android.util.Log.d("SableAvatar", "getAvatar: null response for " + userId); return null; }
 
             String mxcUrl = res.optString("avatar_url", null);
-            if (mxcUrl == null || !mxcUrl.startsWith("mxc://")) return null;
+            if (mxcUrl == null || !mxcUrl.startsWith("mxc://")) { android.util.Log.d("SableAvatar", "getAvatar: no mxc url for " + userId + " res=" + res); return null; }
 
-            // Convert mxc:// to HTTP thumbnail URL
-            String mxc = mxcUrl.substring(6); // strip mxc://
+            String mxc = mxcUrl.substring(6);
             int slash = mxc.indexOf('/');
             if (slash < 0) return null;
             String server = mxc.substring(0, slash);
@@ -187,13 +186,16 @@ public class MatrixProfileCache {
                 + "/_matrix/client/v1/media/thumbnail/" + server + "/" + mediaId
                 + "?width=96&height=96&method=crop";
 
+            android.util.Log.d("SableAvatar", "getAvatar: fetching " + thumbUrl);
             Bitmap bmp = downloadBitmap(thumbUrl);
             if (bmp != null) {
-                // Crop to circle shape is handled by Android's notification system
+                android.util.Log.d("SableAvatar", "getAvatar: got bitmap " + bmp.getWidth() + "x" + bmp.getHeight());
                 avatars.put(userId, bmp);
                 return bmp;
+            } else {
+                android.util.Log.d("SableAvatar", "getAvatar: downloadBitmap returned null");
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) { android.util.Log.e("SableAvatar", "getAvatar exception: " + e.getMessage()); }
         return null;
     }
 
