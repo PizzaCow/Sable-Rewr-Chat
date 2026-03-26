@@ -111,16 +111,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void navigateToRoom(String roomId, boolean isDm) {
         currentRoomId = roomId;
-        try {
-            // Sable paths: /direct/:encodedRoomId/ for DMs, /home/:encodedRoomId/ for rooms
-            String encoded = java.net.URLEncoder.encode(roomId, "UTF-8");
-            String path = isDm ? "/direct/" + encoded + "/" : "/home/" + encoded + "/";
-            String safe = path.replace("\\", "\\\\").replace("'", "\\'");
-            webView.evaluateJavascript("window.location.hash = '" + safe + "';", null);
-        } catch (Exception e) {
-            // fallback
-            webView.evaluateJavascript("window.location.hash = '/home/" + roomId + "/';", null);
-        }
+        // Use JS encodeURIComponent via evaluateJavascript — matches Sable's router exactly
+        // encodeURIComponent leaves ! unencoded but encodes : as %3A
+        String pathPrefix = isDm ? "/direct/" : "/home/";
+        String safeRoomId = roomId.replace("\\", "\\\\").replace("'", "\\'");
+        String js = "(function() {" +
+            "  var encoded = encodeURIComponent('" + safeRoomId + "');" +
+            "  window.location.hash = '" + pathPrefix + "' + encoded + '/';" +
+            "})();";
+        webView.evaluateJavascript(js, null);
     }
 
     private void setupWebView() {
