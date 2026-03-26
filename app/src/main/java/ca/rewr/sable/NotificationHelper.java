@@ -74,8 +74,7 @@ public class NotificationHelper {
                 .addMessage(messageText, timestamp, sender);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFF1B1D22) // Sable dark background color
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setStyle(style)
             .setAutoCancel(true)
             .setContentIntent(pi)
@@ -89,8 +88,7 @@ public class NotificationHelper {
 
         // Group summary (required for bundling on Android 7+)
         NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFF1B1D22)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setGroup(GROUP_KEY)
             .setGroupSummary(true)
             .setAutoCancel(true)
