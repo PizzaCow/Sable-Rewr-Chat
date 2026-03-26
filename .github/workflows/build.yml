@@ -29,6 +29,12 @@ jobs:
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.4
 
+      - name: Get version name
+        id: version
+        run: |
+          VERSION=$(grep versionName app/build.gradle | awk '{print $2}' | tr -d '"')
+          echo "name=v$VERSION" >> $GITHUB_OUTPUT
+
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
@@ -38,8 +44,8 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.01
-          name: v1.01
-          body: "Sable Android v1.01"
+          tag_name: ${{ steps.version.outputs.name }}
+          name: ${{ steps.version.outputs.name }}
+          body: "Sable Android ${{ steps.version.outputs.name }}"
           prerelease: false
           files: sable-android.apk
