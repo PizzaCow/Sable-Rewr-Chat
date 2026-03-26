@@ -7,8 +7,10 @@ public class WebNotificationInterface {
 
     private final NotificationHelper helper;
     private final TokenStore tokenStore;
+    private final Context context;
 
     public WebNotificationInterface(Context context) {
+        this.context = context.getApplicationContext();
         this.helper = new NotificationHelper(context);
         this.tokenStore = new TokenStore(context);
     }
@@ -26,11 +28,18 @@ public class WebNotificationInterface {
         if (tag != null) helper.clearNotification(tag);
     }
 
-    /** Called from the JS shim when it detects a Matrix access token in localStorage */
+    /** Called from the JS shim when it detects a Matrix access token */
     @JavascriptInterface
     public void saveSession(String accessToken, String homeserver) {
         if (accessToken != null && !accessToken.isEmpty()) {
+            boolean wasEmpty = !tokenStore.hasSession();
             tokenStore.saveSession(accessToken, homeserver != null ? homeserver : "https://matrix.rewr.ca");
+            if (wasEmpty) {
+                // Debug: confirm token was captured
+                android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+                main.post(() -> android.widget.Toast.makeText(
+                    context, "Sable: sync connected ✓", android.widget.Toast.LENGTH_SHORT).show());
+            }
         }
     }
 }

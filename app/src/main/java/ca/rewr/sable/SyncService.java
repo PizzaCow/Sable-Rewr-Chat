@@ -34,6 +34,7 @@ public class SyncService extends Service {
     private TokenStore tokenStore;
     private NotificationHelper notifHelper;
 
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -68,6 +69,9 @@ public class SyncService extends Service {
     public IBinder onBind(Intent intent) { return null; }
 
     private void syncLoop() {
+        // Fetch own user ID once on start
+        fetchOwnUserId();
+
         while (running) {
             try {
                 if (!tokenStore.hasSession()) {
@@ -138,6 +142,29 @@ public class SyncService extends Service {
         Log.i(TAG, "Sync loop ended");
     }
 
+    private void fetchOwnUserId() {
+        if (!tokenStore.getOwnUserId().isEmpty()) return;
+        try {
+            URL url = new URL(tokenStore.getHomeserver() + "/_matrix/client/v3/account/whoami");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("Authorization", "Bearer " + tokenStore.getAccessToken());
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            if (conn.getResponseCode() == 200) {
+                BufferedReader r = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = r.readLine()) != null) sb.append(line);
+                conn.disconnect();
+                JSONObject obj = new JSONObject(sb.toString());
+                String userId = obj.optString("user_id", "");
+                if (!userId.isEmpty()) tokenStore.saveOwnUserId(userId);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "whoami failed: " + e.getMessage());
+        }
+    }
+
     private void processNotifications(JSONObject response) throws Exception {
         JSONObject rooms = response.optJSONObject("rooms");
         if (rooms == null) return;
@@ -148,14 +175,11 @@ public class SyncService extends Service {
         JSONArray roomIds = join.names();
         if (roomIds == null) return;
 
+        String ownUserId = tokenStore.getOwnUserId();
+
         for (int i = 0; i < roomIds.length(); i++) {
             String roomId = roomIds.getString(i);
             JSONObject room = join.getJSONObject(roomId);
-
-            JSONObject notifCounts = room.optJSONObject("unread_notifications");
-            int notifCount = notifCounts != null ? notifCounts.optInt("notification_count", 0) : 0;
-            int highlightCount = notifCounts != null ? notifCounts.optInt("highlight_count", 0) : 0;
-            if (notifCount == 0) continue;
 
             JSONObject timeline = room.optJSONObject("timeline");
             if (timeline == null) continue;
@@ -164,7 +188,7 @@ public class SyncService extends Service {
 
             String roomName = getRoomName(room, roomId);
 
-            // Find latest message event
+            // Notify on every new message event, skip own messages
             for (int j = events.length() - 1; j >= 0; j--) {
                 JSONObject event = events.getJSONObject(j);
                 if (!"m.room.message".equals(event.optString("type"))) continue;
@@ -172,26 +196,25 @@ public class SyncService extends Service {
                 JSONObject content = event.optJSONObject("content");
                 if (content == null) continue;
 
-                String sender = event.optString("sender", "Someone");
+                // Skip edits/replies that are just relation events
+                String msgtype = content.optString("msgtype", "");
+                if (msgtype.isEmpty()) continue;
+
+                String senderFull = event.optString("sender", "");
+                // Skip own messages
+                if (!ownUserId.isEmpty() && senderFull.equals(ownUserId)) continue;
+
+                String sender = senderFull;
                 if (sender.startsWith("@")) {
                     int colon = sender.indexOf(':');
                     sender = colon > 0 ? sender.substring(1, colon) : sender.substring(1);
                 }
 
                 String body = content.optString("body", "New message");
-                // Don't notify for own messages
-                if (sender.equals(getOwnUserId())) continue;
-
-                String title = (highlightCount > 0 ? "💬 " : "") + roomName;
-                notifHelper.showNotification(title, sender + ": " + body, roomId);
-                break;
+                notifHelper.showNotification(roomName, sender + ": " + body, roomId);
+                break; // One notif per room per sync
             }
         }
-    }
-
-    private String getOwnUserId() {
-        // We don't store userId yet, return empty to avoid suppressing notifs
-        return "";
     }
 
     private String getRoomName(JSONObject room, String fallback) {
