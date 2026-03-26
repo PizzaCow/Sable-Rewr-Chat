@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.LruCache;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -88,7 +89,14 @@ public class MatrixProfileCache {
             }
         } catch (Exception ignored) {}
 
-        // 3. DM fallback: get members and use the other person's display name
+        // 3. Try full room state API (handles federated servers where individual state lookups may 404)
+        String stateApiName = getRoomNameFromStateApi(roomId);
+        if (stateApiName != null) {
+            roomNames.put(roomId, stateApiName);
+            return stateApiName;
+        }
+
+        // 4. DM fallback: get members and use the other person's display name
         try {
             String ownUserId = tokenStore.getOwnUserId();
             String url = tokenStore.getHomeserver()
@@ -113,7 +121,7 @@ public class MatrixProfileCache {
             }
         } catch (Exception ignored) {}
 
-        // 4. Last resort: shorten room ID (remove the random part)
+        // 5. Last resort: shorten room ID (remove the random part)
         String fallback = roomId.startsWith("!") ? roomId.substring(1) : roomId;
         int colon = fallback.indexOf(':');
         if (colon > 0) {
@@ -178,10 +186,10 @@ public class MatrixProfileCache {
             String url = tokenStore.getHomeserver()
                 + "/_matrix/client/v3/profile/" + encode(userId) + "/avatar_url";
             JSONObject res = getJson(url);
-            if (res == null) { android.util.Log.d("SableAvatar", "getAvatar: null response for " + userId); return null; }
+            if (res == null) { return null; }
 
             String mxcUrl = res.optString("avatar_url", null);
-            if (mxcUrl == null || !mxcUrl.startsWith("mxc://")) { android.util.Log.d("SableAvatar", "getAvatar: no mxc url for " + userId + " res=" + res); return null; }
+            if (mxcUrl == null || !mxcUrl.startsWith("mxc://")) { return null; }
 
             String mxc = mxcUrl.substring(6);
             int slash = mxc.indexOf('/');
@@ -193,24 +201,63 @@ public class MatrixProfileCache {
                 + "/_matrix/client/v1/media/thumbnail/" + server + "/" + mediaId
                 + "?width=96&height=96&method=crop";
 
-            android.util.Log.d("SableAvatar", "getAvatar: fetching " + thumbUrl);
             Bitmap bmp = downloadBitmap(thumbUrl);
             if (bmp == null) {
                 // Fallback: legacy media API (no auth needed on most servers)
                 String legacyUrl = tokenStore.getHomeserver()
                     + "/_matrix/media/v3/thumbnail/" + server + "/" + mediaId
                     + "?width=96&height=96&method=crop";
-                android.util.Log.d("SableAvatar", "getAvatar: trying legacy " + legacyUrl);
                 bmp = downloadBitmap(legacyUrl);
             }
             if (bmp != null) {
-                android.util.Log.d("SableAvatar", "getAvatar: got bitmap " + bmp.getWidth() + "x" + bmp.getHeight());
                 avatars.put(userId, bmp);
                 return bmp;
-            } else {
-                android.util.Log.d("SableAvatar", "getAvatar: downloadBitmap returned null");
             }
-        } catch (Exception e) { android.util.Log.e("SableAvatar", "getAvatar exception: " + e.getMessage()); }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    /**
+     * Fetches the full room state array and extracts a room name or alias.
+     * Returns null if nothing useful is found or on any error.
+     */
+    private String getRoomNameFromStateApi(String roomId) {
+        try {
+            String url = tokenStore.getHomeserver()
+                + "/_matrix/client/v3/rooms/" + encode(roomId) + "/state";
+            URL u = new URL(url);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) u.openConnection();
+            conn.setRequestProperty("Authorization", "Bearer " + tokenStore.getAccessToken());
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            if (conn.getResponseCode() != 200) { conn.disconnect(); return null; }
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                new java.io.InputStreamReader(conn.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line);
+            conn.disconnect();
+
+            JSONArray events = new JSONArray(sb.toString());
+            String aliasName = null;
+            for (int i = 0; i < events.length(); i++) {
+                JSONObject ev = events.getJSONObject(i);
+                String type = ev.optString("type");
+                JSONObject content = ev.optJSONObject("content");
+                if (content == null) continue;
+                if ("m.room.name".equals(type)) {
+                    String name = content.optString("name", null);
+                    if (name != null && !name.isEmpty()) return name;
+                } else if ("m.room.canonical_alias".equals(type) && aliasName == null) {
+                    String alias = content.optString("alias", null);
+                    if (alias != null && alias.startsWith("#")) {
+                        int colon = alias.indexOf(':');
+                        aliasName = colon > 0 ? alias.substring(1, colon) : alias.substring(1);
+                    }
+                }
+            }
+            return aliasName; // null if not found
+        } catch (Exception ignored) {}
         return null;
     }
 

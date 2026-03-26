@@ -40,11 +40,10 @@ public class ConversationShortcutHelper {
                 .setName(roomName)
                 .setImportant(true);
 
-            if (avatar != null) {
-                Bitmap rounded = AvatarHelper.forNotification(avatar);
-                if (rounded != null) {
-                    personBuilder.setIcon(IconCompat.createWithBitmap(rounded));
-                }
+            Bitmap rounded = (avatar != null) ? AvatarHelper.forNotification(avatar) : null;
+
+            if (rounded != null) {
+                personBuilder.setIcon(IconCompat.createWithBitmap(rounded));
             }
 
             ShortcutInfoCompat.Builder shortcutBuilder = new ShortcutInfoCompat.Builder(context, roomId)
@@ -55,11 +54,8 @@ public class ConversationShortcutHelper {
                 .setPerson(personBuilder.build())
                 .setIsConversation();
 
-            if (avatar != null) {
-                Bitmap rounded = AvatarHelper.forNotification(avatar);
-                if (rounded != null) {
-                    shortcutBuilder.setIcon(IconCompat.createWithBitmap(rounded));
-                }
+            if (rounded != null) {
+                shortcutBuilder.setIcon(IconCompat.createWithBitmap(rounded));
             }
 
             ShortcutManagerCompat.pushDynamicShortcut(context, shortcutBuilder.build());

@@ -182,7 +182,7 @@
   // Track current room so we can suppress notifications when user is already there
   function updateCurrentRoom() {
     var hash = window.location.hash || '';
-    var match = hash.match(/\/room\/([^/]+)/);
+    var match = hash.match(/\/(!\w+:[^/]+)\//);
     if (match && window.AndroidNotifications && window.AndroidNotifications.setCurrentRoom) {
       window.AndroidNotifications.setCurrentRoom(decodeURIComponent(match[1]));
     }

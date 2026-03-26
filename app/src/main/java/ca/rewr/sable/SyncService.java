@@ -106,6 +106,7 @@ public class SyncService extends Service {
                 if (code == 401) {
                     Log.w(TAG, "Token expired, stopping sync");
                     tokenStore.saveSession(null, homeserver);
+                    showReloginNotification();
                     Thread.sleep(10000);
                     continue;
                 }
@@ -232,8 +233,10 @@ public class SyncService extends Service {
                 android.graphics.Bitmap senderAvatar = profileCache.getAvatar(senderFull);
                 android.graphics.Bitmap roomAvatar = profileCache.getRoomAvatar(roomId);
 
-                // It's a DM if room avatar is null and only 2 members
-                boolean isDm = (roomAvatar == null);
+                // It's a DM if 2 or fewer members (joined + invited)
+                int joinedCount = room.optInt("joined_member_count", 0);
+                int invitedCount = room.optInt("invited_member_count", 0);
+                boolean isDm = (joinedCount + invitedCount) <= 2;
 
                 notifHelper.showMessage(roomId, roomName, displayName, senderAvatar, roomAvatar,
                     body != null ? body : "New message", isEncrypted, isDm);
@@ -262,6 +265,25 @@ public class SyncService extends Service {
             }
         } catch (Exception ignored) {}
         return null;
+    }
+
+    private void showReloginNotification() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pi = PendingIntent.getActivity(this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationHelper.CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Rewr.chat — Session expired")
+            .setContentText("Tap to sign in again")
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .setPriority(NotificationCompat.PRIORITY_HIGH);
+
+        try {
+            androidx.core.app.NotificationManagerCompat.from(this).notify(9001, builder.build());
+        } catch (SecurityException ignored) {}
     }
 
     private void createServiceChannel() {
