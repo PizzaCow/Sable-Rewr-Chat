@@ -53,11 +53,12 @@ public class MatrixProfileCache {
         return fallback;
     }
 
-    /** Returns room name, falls back to shortened room ID */
+    /** Returns room name, falls back to DM partner's display name, then room ID */
     public String getRoomName(String roomId) {
         String cached = roomNames.get(roomId);
         if (cached != null) return cached;
 
+        // 1. Try m.room.name
         try {
             String url = tokenStore.getHomeserver()
                 + "/_matrix/client/v3/rooms/" + encode(roomId) + "/state/m.room.name";
@@ -71,7 +72,7 @@ public class MatrixProfileCache {
             }
         } catch (Exception ignored) {}
 
-        // Try room aliases
+        // 2. Try canonical alias
         try {
             String url = tokenStore.getHomeserver()
                 + "/_matrix/client/v3/rooms/" + encode(roomId) + "/state/m.room.canonical_alias";
@@ -87,10 +88,40 @@ public class MatrixProfileCache {
             }
         } catch (Exception ignored) {}
 
-        // Fallback: shorten the room ID
+        // 3. DM fallback: get members and use the other person's display name
+        try {
+            String ownUserId = tokenStore.getOwnUserId();
+            String url = tokenStore.getHomeserver()
+                + "/_matrix/client/v3/rooms/" + encode(roomId) + "/members?membership=join";
+            JSONObject res = getJson(url);
+            if (res != null) {
+                org.json.JSONArray chunk = res.optJSONArray("chunk");
+                if (chunk != null) {
+                    for (int i = 0; i < chunk.length(); i++) {
+                        JSONObject member = chunk.getJSONObject(i);
+                        String userId = member.optString("state_key", "");
+                        if (!userId.equals(ownUserId) && !userId.isEmpty()) {
+                            // Use their display name from content, or fetch it
+                            JSONObject content = member.optJSONObject("content");
+                            String name = content != null ? content.optString("displayname", null) : null;
+                            if (name == null || name.isEmpty()) name = getDisplayName(userId);
+                            roomNames.put(roomId, name);
+                            return name;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // 4. Last resort: shorten room ID (remove the random part)
         String fallback = roomId.startsWith("!") ? roomId.substring(1) : roomId;
         int colon = fallback.indexOf(':');
-        fallback = colon > 0 ? fallback.substring(0, Math.min(colon, 12)) : fallback.substring(0, Math.min(fallback.length(), 12));
+        if (colon > 0) {
+            // Use the server domain as the name rather than the random ID
+            fallback = fallback.substring(colon + 1);
+        } else {
+            fallback = fallback.substring(0, Math.min(fallback.length(), 12));
+        }
         roomNames.put(roomId, fallback);
         return fallback;
     }

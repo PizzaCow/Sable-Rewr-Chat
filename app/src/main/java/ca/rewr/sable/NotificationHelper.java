@@ -58,7 +58,7 @@ public class NotificationHelper {
         }
         Person sender = personBuilder.build();
 
-        String messageText = isEncrypted ? "🔒 New message" : body;
+        String messageText = isEncrypted ? "New message" : body;
         long timestamp = System.currentTimeMillis();
 
         NotificationCompat.MessagingStyle style =
