@@ -16,7 +16,7 @@ public class NotificationHelper {
 
     public static final String CHANNEL_ID = "sable_messages";
     private static final String CHANNEL_NAME = "Messages";
-    private static final String GROUP_KEY = "ca.rewr.sable.MESSAGES";
+    public static final String GROUP_KEY = "ca.rewr.sable.MESSAGES";
     private static final int GROUP_SUMMARY_ID = 0;
 
     private final Context context;
