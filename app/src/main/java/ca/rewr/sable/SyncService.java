@@ -269,7 +269,8 @@ public class SyncService extends Service {
             PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF1B1D22)
             .setContentTitle("Sable")
             .setContentText("Connected")
             .setContentIntent(pi)
