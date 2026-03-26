@@ -24,7 +24,7 @@ import java.net.URLEncoder;
 public class SyncService extends Service {
 
     private static final String TAG = "SableSyncService";
-    private static final String CHANNEL_ID = "sable_sync_service";
+    private static final String CHANNEL_ID = "sable_sync_service_v2";
     private static final int FOREGROUND_ID = 1001;
     // 30s long-poll timeout
     private static final int LONG_POLL_MS = 30000;
