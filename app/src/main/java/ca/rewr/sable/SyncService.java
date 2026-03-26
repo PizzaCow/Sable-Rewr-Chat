@@ -277,6 +277,7 @@ public class SyncService extends Service {
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+            .setGroup(NotificationHelper.GROUP_KEY)
             .build();
     }
 }
