@@ -155,6 +155,12 @@ public class MatrixProfileCache {
                 + "?width=96&height=96&method=crop";
 
             Bitmap bmp = downloadBitmap(thumbUrl);
+            if (bmp == null) {
+                String legacyUrl = tokenStore.getHomeserver()
+                    + "/_matrix/media/v3/thumbnail/" + server + "/" + mediaId
+                    + "?width=96&height=96&method=crop";
+                bmp = downloadBitmap(legacyUrl);
+            }
             if (bmp != null) {
                 avatars.put("room:" + roomId, bmp);
                 return bmp;
@@ -182,12 +188,21 @@ public class MatrixProfileCache {
             if (slash < 0) return null;
             String server = mxc.substring(0, slash);
             String mediaId = mxc.substring(slash + 1);
+            // Try authenticated endpoint first, fall back to legacy unauthed
             String thumbUrl = tokenStore.getHomeserver()
                 + "/_matrix/client/v1/media/thumbnail/" + server + "/" + mediaId
                 + "?width=96&height=96&method=crop";
 
             android.util.Log.d("SableAvatar", "getAvatar: fetching " + thumbUrl);
             Bitmap bmp = downloadBitmap(thumbUrl);
+            if (bmp == null) {
+                // Fallback: legacy media API (no auth needed on most servers)
+                String legacyUrl = tokenStore.getHomeserver()
+                    + "/_matrix/media/v3/thumbnail/" + server + "/" + mediaId
+                    + "?width=96&height=96&method=crop";
+                android.util.Log.d("SableAvatar", "getAvatar: trying legacy " + legacyUrl);
+                bmp = downloadBitmap(legacyUrl);
+            }
             if (bmp != null) {
                 android.util.Log.d("SableAvatar", "getAvatar: got bitmap " + bmp.getWidth() + "x" + bmp.getHeight());
                 avatars.put(userId, bmp);
@@ -215,16 +230,32 @@ public class MatrixProfileCache {
     }
 
     private Bitmap downloadBitmap(String urlStr) throws Exception {
-        URL url = new URL(urlStr);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestProperty("Authorization", "Bearer " + tokenStore.getAccessToken());
-        conn.setConnectTimeout(5000);
-        conn.setReadTimeout(8000);
-        if (conn.getResponseCode() != 200) { conn.disconnect(); return null; }
-        InputStream is = conn.getInputStream();
-        Bitmap bmp = BitmapFactory.decodeStream(is);
-        conn.disconnect();
-        return bmp;
+        // Follow up to 5 redirects manually (HttpURLConnection won't follow http->https)
+        String currentUrl = urlStr;
+        for (int i = 0; i < 5; i++) {
+            URL url = new URL(currentUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setInstanceFollowRedirects(false);
+            conn.setRequestProperty("Authorization", "Bearer " + tokenStore.getAccessToken());
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(8000);
+
+            int code = conn.getResponseCode();
+            if (code == 301 || code == 302 || code == 307 || code == 308) {
+                String location = conn.getHeaderField("Location");
+                conn.disconnect();
+                if (location == null) break;
+                currentUrl = location;
+                continue;
+            }
+            if (code != 200) { conn.disconnect(); return null; }
+
+            InputStream is = conn.getInputStream();
+            Bitmap bmp = BitmapFactory.decodeStream(is);
+            conn.disconnect();
+            return bmp;
+        }
+        return null;
     }
 
     private String encode(String s) throws Exception {
