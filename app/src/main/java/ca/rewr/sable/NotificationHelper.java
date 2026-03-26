@@ -12,8 +12,6 @@ import android.service.notification.StatusBarNotification;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
-import androidx.core.app.Person;
-import androidx.core.graphics.drawable.IconCompat;
 
 public class NotificationHelper {
 
@@ -59,37 +57,27 @@ public class NotificationHelper {
         // Round the avatar corners before use
         Bitmap roundedAvatar = AvatarHelper.forNotification(senderAvatar);
 
-        // Build sender Person with avatar
-        Person.Builder personBuilder = new Person.Builder().setName(senderName);
-        if (roundedAvatar != null) {
-            personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
-        }
-        Person sender = personBuilder.build();
-
         String messageText = isEncrypted ? "New message" : body;
-        long timestamp = System.currentTimeMillis();
-
-        NotificationCompat.MessagingStyle style =
-            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
-                .setConversationTitle(roomName)
-                .addMessage(messageText, timestamp, sender);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setStyle(style)
+            .setContentTitle(senderName)
+            .setContentText(messageText)
+            .setStyle(new NotificationCompat.BigTextStyle()
+                .setBigContentTitle(senderName)
+                .setSummaryText(roomName)
+                .bigText(messageText))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setGroup(GROUP_KEY)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setNumber(1);
 
-        // Set large icon so it shows in collapsed single-notification view
+        // Large icon (avatar) shows in both collapsed and expanded views with BigTextStyle
         if (roundedAvatar != null) {
             builder.setLargeIcon(roundedAvatar);
         }
-
-        // Only alert on individual notifications, not the summary
-        builder.setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
