@@ -274,7 +274,7 @@ public class SyncService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Sable")
+            .setContentTitle("Rewr.chat")
             .setContentText("Connected")
             .setContentIntent(pi)
             .setOngoing(true)

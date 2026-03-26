@@ -39,7 +39,7 @@ jobs:
         run: ./gradlew assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk sable-android.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk rewr-chat.apk
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -51,7 +51,8 @@ jobs:
             - DM notifications (shows "New message" to keep content private)
             - SSO login now works properly
             - stays logged in between sessions
-            - proper Sable icon
-            - rounded profile pictures in notifications
+            - Rewr Chat icon
+            - circular profile pictures in notifications with app badge
+            - shows last 3 messages in notification
           prerelease: false
-          files: sable-android.apk
+          files: rewr-chat.apk

@@ -17,7 +17,7 @@ public class WebNotificationInterface {
 
     @JavascriptInterface
     public void showNotification(String title, String body, String tag) {
-        if (title == null) title = "Sable";
+        if (title == null) title = "Rewr.chat";
         if (body == null) body = "";
         if (tag == null) tag = String.valueOf(System.currentTimeMillis());
         helper.showNotification(title, body, tag);
@@ -38,7 +38,7 @@ public class WebNotificationInterface {
                 // Debug: confirm token was captured
                 android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
                 main.post(() -> android.widget.Toast.makeText(
-                    context, "Sable: sync connected ✓", android.widget.Toast.LENGTH_SHORT).show());
+                    context, "Rewr.chat: sync connected ✓", android.widget.Toast.LENGTH_SHORT).show());
             }
         }
     }

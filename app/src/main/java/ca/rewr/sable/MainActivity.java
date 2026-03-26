@@ -102,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setLoadsImagesAutomatically(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setUserAgentString(settings.getUserAgentString() + " SableAndroid/1.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " RewrChat/1.0");
 
         // Persist cookies and storage across sessions
         CookieManager cookieManager = CookieManager.getInstance();

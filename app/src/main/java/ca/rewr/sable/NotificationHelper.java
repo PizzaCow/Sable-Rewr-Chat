@@ -114,7 +114,7 @@ public class NotificationHelper {
             if (messageNotifCount >= 2) {
                 NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("Sable")
+                    .setContentTitle("Rewr.chat")
                     .setContentText(messageNotifCount + " new notifications")
                     .setGroup(GROUP_KEY)
                     .setGroupSummary(true)
