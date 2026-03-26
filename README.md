@@ -1,25 +1,15 @@
-# Sable Android
+# Rewr Chat Client
 
-A native Android WebView wrapper for [Sable](https://chat.rewr.ca) — the Matrix client for [rewr.ca](https://rewr.ca).
+An Android WebView wrapper for [Sable](https://github.com/SableClient/Sable) (Which is a fork of Cinny) connected to my own client [rewr.ca](https://rewr.ca).
 
 ## Features
 
-- Full-screen WebView with no browser chrome
-- Back button navigation
-- Camera & microphone permissions for calls and file uploads
-- File/image picker support
-- External links open in the system browser
+- Full-screen appplication that behaves like a native app
+- Camera and microphone integration for calls
+- image, file picker, and notification support
 
-## Building
+## Disclaimer
 
-GitHub Actions builds a debug APK automatically on every push to `main`.  
-Download from the **Actions** tab → latest run → **sable-android-debug** artifact.
+AI was used to assist making this application. This is not affiliated with Sable client, but i support the devs and very much support the ongoing developmemt of Cinny and Sable client.
 
-### Manual build
-
-```bash
-./gradlew assembleDebug
-# APK at: app/build/outputs/apk/debug/app-debug.apk
-```
-
-Requires JDK 17 and Android SDK.
+This application does not track or share any data with 3rd party services.
