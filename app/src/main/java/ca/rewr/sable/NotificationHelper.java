@@ -7,6 +7,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 
+import android.app.NotificationManager;
+import android.service.notification.StatusBarNotification;
+
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
@@ -94,10 +97,17 @@ public class NotificationHelper {
             nm.notify(notifId, builder.build());
 
             // Count only active message notifications (exclude service notification)
-            long messageNotifCount = nm.getActiveNotifications().stream()
-                .filter(n -> CHANNEL_ID.equals(n.getNotification().getChannelId())
-                    && n.getId() != GROUP_SUMMARY_ID)
-                .count();
+            NotificationManager systemNm = (NotificationManager)
+                context.getSystemService(Context.NOTIFICATION_SERVICE);
+            StatusBarNotification[] active = systemNm != null
+                ? systemNm.getActiveNotifications() : new StatusBarNotification[0];
+            long messageNotifCount = 0;
+            for (StatusBarNotification sbn : active) {
+                if (CHANNEL_ID.equals(sbn.getNotification().getChannelId())
+                        && sbn.getId() != GROUP_SUMMARY_ID) {
+                    messageNotifCount++;
+                }
+            }
 
             if (messageNotifCount >= 2) {
                 Bitmap summaryIcon = roomAvatar != null
