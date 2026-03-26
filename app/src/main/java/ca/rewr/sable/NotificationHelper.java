@@ -50,7 +50,7 @@ public class NotificationHelper {
      * @param isEncrypted Whether the message is encrypted (show generic body)
      */
     public void showMessage(String roomId, String roomName, String senderName,
-                            Bitmap senderAvatar, Bitmap roomAvatar, String body, boolean isEncrypted) {
+                            Bitmap senderAvatar, Bitmap roomAvatar, String body, boolean isEncrypted, boolean isDm) {
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pi = PendingIntent.getActivity(context, roomId.hashCode(), intent,
@@ -68,16 +68,21 @@ public class NotificationHelper {
         }
         Person sender = personBuilder.build();
 
+        // DMs: show sender name as title, no conversation title needed
+        // Groups: show room name as title, sender name appears on the message bubble
         NotificationCompat.MessagingStyle style =
             new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
-                .setConversationTitle(roomName)
+                .setConversationTitle(isDm ? null : roomName)
+                .setGroupConversation(!isDm)
                 .addMessage(messageText, System.currentTimeMillis(), sender);
+
+        // Large icon: DMs use sender avatar, groups use room avatar (or sender as fallback)
+        Bitmap largeIcon = isDm ? roundedAvatar : (roomAvatar != null ? AvatarHelper.forNotification(roomAvatar) : roundedAvatar);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setStyle(style)
-            // setLargeIcon controls the LEFT icon in collapsed view — overrides app icon
-            .setLargeIcon(roundedAvatar)
+            .setLargeIcon(largeIcon)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -104,9 +109,7 @@ public class NotificationHelper {
             }
 
             if (messageNotifCount >= 2) {
-                Bitmap summaryIcon = roomAvatar != null
-                    ? AvatarHelper.forNotification(roomAvatar)
-                    : roundedAvatar;
+                Bitmap summaryIcon = largeIcon;
 
                 NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.mipmap.ic_launcher)
