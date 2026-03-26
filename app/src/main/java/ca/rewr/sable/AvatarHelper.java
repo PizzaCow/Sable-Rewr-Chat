@@ -35,10 +35,10 @@ public class AvatarHelper {
         return output;
     }
 
-    /** Slightly rounded — matches modern Android notification style */
+    /** Circular crop for notification avatars */
     public static Bitmap forNotification(Bitmap src) {
         if (src == null) return null;
-        float radius = src.getWidth() * 0.2f;
+        float radius = src.getWidth() / 2f; // full circle
         return roundCorners(src, radius);
     }
 
