@@ -26,6 +26,7 @@ public class NotificationHelper {
 
     private final Context context;
     private final ConversationShortcutHelper shortcutHelper;
+    private final MessageHistory messageHistory = new MessageHistory();
 
     public NotificationHelper(Context context) {
         this.context = context.getApplicationContext();
@@ -62,17 +63,20 @@ public class NotificationHelper {
         // Push conversation shortcut (required for avatar to show in collapsed view on Android 11+)
         shortcutHelper.pushShortcut(roomId, isDm ? senderName : roomName, baseAvatar, !isDm);
 
-        // Build sender Person
-        Person.Builder personBuilder = new Person.Builder().setName(senderName);
-        if (roundedAvatar != null) personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
-        Person sender = personBuilder.build();
+        // Store message in history (up to 3 per room)
+        messageHistory.add(roomId, senderName, messageText, roundedAvatar);
 
-        // MessagingStyle linked to shortcut — Android uses the shortcut icon in collapsed view
+        // Build MessagingStyle with last 3 messages
         NotificationCompat.MessagingStyle style =
             new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
                 .setConversationTitle(isDm ? null : roomName)
-                .setGroupConversation(!isDm)
-                .addMessage(messageText, System.currentTimeMillis(), sender);
+                .setGroupConversation(!isDm);
+
+        for (MessageHistory.Message msg : messageHistory.get(roomId)) {
+            Person.Builder pb = new Person.Builder().setName(msg.senderName);
+            if (msg.avatar != null) pb.setIcon(IconCompat.createWithBitmap(msg.avatar));
+            style.addMessage(msg.body, msg.timestamp, pb.build());
+        }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -140,6 +144,7 @@ public class NotificationHelper {
     public void clearNotification(String roomId) {
         NotificationManagerCompat.from(context).cancel(
             (CHANNEL_ID + roomId).hashCode());
+        messageHistory.clear(roomId);
     }
 
     /** Legacy method for JS-bridge foreground notifications */
