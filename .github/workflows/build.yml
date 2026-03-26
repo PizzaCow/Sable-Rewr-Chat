@@ -47,12 +47,11 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            ## What's new in ${{ steps.version.outputs.name }}
-
-            - 🔔 **Instant notifications** — persistent background sync keeps you connected even when the app is closed
-            - 💬 **DM notifications** — encrypted DMs now correctly trigger notifications ("New message" to preserve privacy)
-            - 🔐 **SSO login fixed** — authentication flow now stays inside the app instead of opening the browser
-            - 💾 **Stay logged in** — sessions now persist across app restarts
-            - 🖼️ **Sable icon** — proper launcher icon across all screen densities
+            - instant notifications when the app is closed
+            - DM notifications (shows "New message" to keep content private)
+            - SSO login now works properly
+            - stays logged in between sessions
+            - proper Sable icon
+            - rounded profile pictures in notifications
           prerelease: false
           files: sable-android.apk
