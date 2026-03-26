@@ -43,6 +43,9 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraImageUri;
     private String notificationShimJs;
+    private boolean pageReady = false;
+    private String pendingNavigationRoomId = null;
+    private boolean pendingNavigationIsDm = false;
 
     // Track foreground state and current room for notification suppression
     public static boolean isInForeground = false;
@@ -78,6 +81,12 @@ public class MainActivity extends AppCompatActivity {
 
         webView.loadUrl(SABLE_URL);
 
+        // Queue room navigation if launched from notification
+        if (getIntent() != null && getIntent().hasExtra("room_id")) {
+            pendingNavigationRoomId = getIntent().getStringExtra("room_id");
+            pendingNavigationIsDm = getIntent().getBooleanExtra("is_dm", false);
+        }
+
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
 
         // Only request notification permission upfront — mic/storage requested on demand
@@ -111,8 +120,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void navigateToRoom(String roomId, boolean isDm) {
         currentRoomId = roomId;
-        // Use JS encodeURIComponent via evaluateJavascript — matches Sable's router exactly
-        // encodeURIComponent leaves ! unencoded but encodes : as %3A
+        if (!pageReady) {
+            // Page not ready yet — queue it
+            pendingNavigationRoomId = roomId;
+            pendingNavigationIsDm = isDm;
+            return;
+        }
         String pathPrefix = isDm ? "/direct/" : "/home/";
         String safeRoomId = roomId.replace("\\", "\\\\").replace("'", "\\'");
         String js = "(function() {" +
@@ -157,17 +170,17 @@ public class MainActivity extends AppCompatActivity {
                 if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
                     view.evaluateJavascript(notificationShimJs, null);
                 }
-                // Navigate to room from launch intent after page loads
-                Intent launchIntent = getIntent();
-                if (launchIntent != null) {
-                    String roomId = launchIntent.getStringExtra("room_id");
-                    if (roomId != null) {
-                        boolean isDm = launchIntent.getBooleanExtra("is_dm", false);
-                        // Delay for React to mount
-                        view.postDelayed(() -> navigateToRoom(roomId, isDm), 1500);
-                        launchIntent.removeExtra("room_id");
+                // Mark page ready after React has had time to mount
+                view.postDelayed(() -> {
+                    pageReady = true;
+                    // Handle any queued navigation
+                    if (pendingNavigationRoomId != null) {
+                        String roomId = pendingNavigationRoomId;
+                        boolean isDm = pendingNavigationIsDm;
+                        pendingNavigationRoomId = null;
+                        navigateToRoom(roomId, isDm);
                     }
-                }
+                }, 1500);
             }
         });
 

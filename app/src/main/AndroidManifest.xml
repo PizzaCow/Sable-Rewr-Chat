@@ -25,6 +25,7 @@
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="true"
+            android:launchMode="singleTask"
             android:alwaysRetainTaskState="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
