@@ -12,8 +12,6 @@ import android.service.notification.StatusBarNotification;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
-import androidx.core.app.Person;
-import androidx.core.graphics.drawable.IconCompat;
 
 public class NotificationHelper {
 
@@ -39,35 +37,31 @@ public class NotificationHelper {
         if (nm != null) nm.createNotificationChannel(channel);
     }
 
-    /**
-     * Show a Telegram-style MessagingStyle notification for a room.
-     *
-     * @param roomId      Room ID (used as notification tag)
-     * @param roomName    Human-readable room name
-     * @param senderName  Display name of the sender
-     * @param senderAvatar Avatar bitmap for the sender (nullable)
-     * @param body        Message body
-     * @param isEncrypted Whether the message is encrypted (show generic body)
-     */
     public void showMessage(String roomId, String roomName, String senderName,
-                            Bitmap senderAvatar, Bitmap roomAvatar, String body, boolean isEncrypted, boolean isDm) {
+                            Bitmap senderAvatar, Bitmap roomAvatar, String body,
+                            boolean isEncrypted, boolean isDm) {
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pi = PendingIntent.getActivity(context, roomId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Round the avatar corners before use
-        Bitmap roundedAvatar = AvatarHelper.forNotification(senderAvatar);
-
         String messageText = isEncrypted ? "New message" : body;
 
-        // Large icon: DMs use sender avatar, groups use room avatar (or sender as fallback)
-        Bitmap baseIcon = isDm ? roundedAvatar : (roomAvatar != null ? AvatarHelper.forNotification(roomAvatar) : roundedAvatar);
-        // Badge the Sable app icon onto the bottom-right corner
-        Bitmap largeIcon = AvatarHelper.withAppBadge(baseIcon, getAppIconBitmap());
+        // Pick the right avatar
+        Bitmap baseAvatar = isDm
+            ? senderAvatar
+            : (roomAvatar != null ? roomAvatar : senderAvatar);
+        Bitmap roundedAvatar = AvatarHelper.forNotification(baseAvatar);
+        Bitmap badgedAvatar  = AvatarHelper.withAppBadge(roundedAvatar, getAppIconBitmap());
 
+        // Simple notification — setLargeIcon always shows in collapsed view
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(isDm ? senderName : roomName)
+            .setContentText(isDm ? messageText : senderName + ": " + messageText)
+            .setStyle(new NotificationCompat.BigTextStyle()
+                .bigText(isDm ? messageText : senderName + ": " + messageText)
+                .setSummaryText(isDm ? null : roomName))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -75,27 +69,14 @@ public class NotificationHelper {
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setNumber(1);
 
-        if (largeIcon != null) builder.setLargeIcon(largeIcon);
-
-        // Both DMs and groups use MessagingStyle for consistent avatar placement
-        Person.Builder personBuilder = new Person.Builder().setName(senderName);
-        if (roundedAvatar != null) personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
-        Person sender = personBuilder.build();
-
-        NotificationCompat.MessagingStyle style =
-            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
-                .setConversationTitle(isDm ? null : roomName)
-                .setGroupConversation(!isDm)
-                .addMessage(messageText, System.currentTimeMillis(), sender);
-
-        builder.setStyle(style);
+        if (badgedAvatar != null) builder.setLargeIcon(badgedAvatar);
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
             int notifId = (CHANNEL_ID + roomId).hashCode();
             nm.notify(notifId, builder.build());
 
-            // Count only active message notifications (exclude service notification)
+            // Count active message notifications
             NotificationManager systemNm = (NotificationManager)
                 context.getSystemService(Context.NOTIFICATION_SERVICE);
             StatusBarNotification[] active = systemNm != null
@@ -118,10 +99,8 @@ public class NotificationHelper {
                     .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_LOW);
-
                 nm.notify(GROUP_SUMMARY_ID, summary.build());
             } else {
-                // Cancel any leftover summary so the single notif shows standalone
                 nm.cancel(GROUP_SUMMARY_ID);
             }
         } catch (SecurityException ignored) {}
@@ -152,15 +131,11 @@ public class NotificationHelper {
         PendingIntent pi = PendingIntent.getActivity(context, tag.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        Person sender = new Person.Builder().setName(title).build();
-        NotificationCompat.MessagingStyle style =
-            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
-                .setConversationTitle(title)
-                .addMessage(body, System.currentTimeMillis(), sender);
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setStyle(style)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH);
