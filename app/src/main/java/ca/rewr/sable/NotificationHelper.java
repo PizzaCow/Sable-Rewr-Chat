@@ -107,17 +107,16 @@ public class NotificationHelper {
             }
 
             if (messageNotifCount >= 2) {
-                Bitmap summaryIcon = largeIcon;
-
                 NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle("Sable")
+                    .setContentText(messageNotifCount + " new notifications")
                     .setGroup(GROUP_KEY)
                     .setGroupSummary(true)
                     .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_LOW);
 
-                if (summaryIcon != null) summary.setLargeIcon(summaryIcon);
                 nm.notify(GROUP_SUMMARY_ID, summary.build());
             } else {
                 // Cancel any leftover summary so the single notif shows standalone
