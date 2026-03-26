@@ -12,6 +12,10 @@ import android.service.notification.StatusBarNotification;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.Person;
+import androidx.core.content.LocusIdCompat;
+import androidx.core.content.pm.ShortcutInfoCompat;
+import androidx.core.graphics.drawable.IconCompat;
 
 public class NotificationHelper {
 
@@ -21,9 +25,11 @@ public class NotificationHelper {
     private static final int GROUP_SUMMARY_ID = 0;
 
     private final Context context;
+    private final ConversationShortcutHelper shortcutHelper;
 
     public NotificationHelper(Context context) {
         this.context = context.getApplicationContext();
+        this.shortcutHelper = new ConversationShortcutHelper(context);
         createChannel();
     }
 
@@ -52,16 +58,27 @@ public class NotificationHelper {
             ? senderAvatar
             : (roomAvatar != null ? roomAvatar : senderAvatar);
         Bitmap roundedAvatar = AvatarHelper.forNotification(baseAvatar);
-        Bitmap badgedAvatar  = AvatarHelper.withAppBadge(roundedAvatar, getAppIconBitmap());
 
-        // Simple notification — setLargeIcon always shows in collapsed view
+        // Push conversation shortcut (required for avatar to show in collapsed view on Android 11+)
+        shortcutHelper.pushShortcut(roomId, isDm ? senderName : roomName, baseAvatar, !isDm);
+
+        // Build sender Person
+        Person.Builder personBuilder = new Person.Builder().setName(senderName);
+        if (roundedAvatar != null) personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
+        Person sender = personBuilder.build();
+
+        // MessagingStyle linked to shortcut — Android uses the shortcut icon in collapsed view
+        NotificationCompat.MessagingStyle style =
+            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
+                .setConversationTitle(isDm ? null : roomName)
+                .setGroupConversation(!isDm)
+                .addMessage(messageText, System.currentTimeMillis(), sender);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(isDm ? senderName : roomName)
-            .setContentText(isDm ? messageText : senderName + ": " + messageText)
-            .setStyle(new NotificationCompat.BigTextStyle()
-                .bigText(isDm ? messageText : senderName + ": " + messageText)
-                .setSummaryText(isDm ? null : roomName))
+            .setStyle(style)
+            .setShortcutId(roomId)
+            .setLocusId(new LocusIdCompat(roomId))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -69,7 +86,8 @@ public class NotificationHelper {
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setNumber(1);
 
-        if (badgedAvatar != null) builder.setLargeIcon(badgedAvatar);
+        // Also set largeIcon as fallback for older Android
+        if (roundedAvatar != null) builder.setLargeIcon(roundedAvatar);
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
