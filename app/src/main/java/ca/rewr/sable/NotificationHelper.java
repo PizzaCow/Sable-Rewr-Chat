@@ -131,15 +131,11 @@ public class NotificationHelper {
         PendingIntent pi = PendingIntent.getActivity(context, tag.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        Person sender = new Person.Builder().setName(title).build();
-        NotificationCompat.MessagingStyle style =
-            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
-                .setConversationTitle(title)
-                .addMessage(body, System.currentTimeMillis(), sender);
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setStyle(style)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH);
