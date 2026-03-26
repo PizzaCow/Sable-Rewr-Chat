@@ -51,10 +51,13 @@ public class NotificationHelper {
         PendingIntent pi = PendingIntent.getActivity(context, roomId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        // Round the avatar corners before use
+        Bitmap roundedAvatar = AvatarHelper.forNotification(senderAvatar);
+
         // Build sender Person with avatar
         Person.Builder personBuilder = new Person.Builder().setName(senderName);
-        if (senderAvatar != null) {
-            personBuilder.setIcon(IconCompat.createWithBitmap(senderAvatar));
+        if (roundedAvatar != null) {
+            personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
         }
         Person sender = personBuilder.build();
 
@@ -74,9 +77,9 @@ public class NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setNumber(1);
 
-        // Use sender avatar as large icon if available
-        if (senderAvatar != null) {
-            builder.setLargeIcon(senderAvatar);
+        // Use rounded avatar as large icon
+        if (roundedAvatar != null) {
+            builder.setLargeIcon(roundedAvatar);
         }
 
         try {
