@@ -8,6 +8,11 @@ An Android WebView wrapper for [Sable](https://github.com/SableClient/Sable) (Wh
 - Camera and microphone integration for calls
 - image, file picker, and notification support
 
+## Installation
+
+Download the latest [Release](https://github.com/PizzaCow/Sable-Rewr-Chat/releases)  <<Here and Install to your Android device 
+# the app will ask for notification, camera, microphone, and file permissions, these are just for the functionality of Sable client
+
 ## Disclaimers on AI, Affiliation
 
 AI was used to assist with creating this application. 
