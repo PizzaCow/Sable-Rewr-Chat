@@ -226,19 +226,42 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
-        String roomId = intent.getStringExtra("room_id");
+        final String roomId = intent.getStringExtra("room_id");
         if (roomId == null || roomId.isEmpty()) return;
 
-        // Delay slightly to let Sable's React app finish mounting
-        webView.postDelayed(() -> {
-            String js = "(function() {" +
-                "  var roomId = '" + roomId.replace("'", "\\'") + "';" +
-                "  try {" +
-                "    window.location.hash = '/room/' + roomId;" +
-                "  } catch(e) {}" +
-                "})();";
-            webView.evaluateJavascript(js, null);
-        }, 1500);
+        // Inject into page load — fires after Sable has mounted
+        webView.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(android.webkit.WebView view,
+                    android.webkit.WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                if (url.contains("rewr.ca") || url.contains("rewr.chat")) return false;
+                try { startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))); }
+                catch (Exception ignored) {}
+                return true;
+            }
+
+            @Override
+            public void onPageFinished(android.webkit.WebView view, String url) {
+                // Inject notification shim
+                if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
+                    view.evaluateJavascript(notificationShimJs, null);
+                }
+                // Navigate to room after React mounts (poll until hash changes)
+                String safeRoomId = roomId.replace("'", "\\'");
+                String js = "(function tryNav(attempts) {" +
+                    "  if (attempts <= 0) return;" +
+                    "  try {" +
+                    "    window.location.hash = '/room/" + safeRoomId + "';" +
+                    "  } catch(e) {}" +
+                    "  setTimeout(function(){ tryNav(attempts - 1); }, 800);" +
+                    "})(5);";
+                view.postDelayed(() -> view.evaluateJavascript(js, null), 1000);
+
+                // Restore normal WebViewClient after first load
+                setupWebView();
+            }
+        });
     }
 
     @Override
