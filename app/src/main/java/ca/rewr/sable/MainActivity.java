@@ -114,11 +114,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
-                if (url.startsWith("https://chat.rewr.ca") || url.startsWith("https://rewr.chat")) {
+                // Keep all rewr.ca and rewr.chat domains in the WebView (covers SSO/MAS flows)
+                if (url.contains("rewr.ca") || url.contains("rewr.chat")) {
                     return false;
                 }
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                startActivity(intent);
+                // Open everything else in the system browser
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    startActivity(intent);
+                } catch (Exception ignored) {}
                 return true;
             }
 
