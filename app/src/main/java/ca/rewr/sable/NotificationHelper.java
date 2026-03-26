@@ -75,25 +75,18 @@ public class NotificationHelper {
 
         if (largeIcon != null) builder.setLargeIcon(largeIcon);
 
-        if (isDm) {
-            // DM: plain notification — setLargeIcon reliably shows in collapsed view
-            builder.setContentTitle(senderName)
-                   .setContentText(messageText)
-                   .setStyle(new NotificationCompat.BigTextStyle()
-                       .bigText(messageText)
-                       .setSummaryText(roomName));
-        } else {
-            // Group: MessagingStyle with room name as header
-            Person.Builder personBuilder = new Person.Builder().setName(senderName);
-            if (roundedAvatar != null) personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
-            Person sender = personBuilder.build();
+        // Both DMs and groups use MessagingStyle for consistent avatar placement
+        Person.Builder personBuilder = new Person.Builder().setName(senderName);
+        if (roundedAvatar != null) personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
+        Person sender = personBuilder.build();
 
-            builder.setStyle(new NotificationCompat.MessagingStyle(
-                    new Person.Builder().setName("You").build())
-                .setConversationTitle(roomName)
-                .setGroupConversation(true)
-                .addMessage(messageText, System.currentTimeMillis(), sender));
-        }
+        NotificationCompat.MessagingStyle style =
+            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
+                .setConversationTitle(isDm ? null : roomName)
+                .setGroupConversation(!isDm)
+                .addMessage(messageText, System.currentTimeMillis(), sender);
+
+        builder.setStyle(style);
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
