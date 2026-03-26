@@ -12,6 +12,8 @@ import android.service.notification.StatusBarNotification;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.Person;
+import androidx.core.graphics.drawable.IconCompat;
 
 public class NotificationHelper {
 
@@ -59,25 +61,29 @@ public class NotificationHelper {
 
         String messageText = isEncrypted ? "New message" : body;
 
+        // Build Person with avatar for MessagingStyle (expanded bubble)
+        Person.Builder personBuilder = new Person.Builder().setName(senderName);
+        if (roundedAvatar != null) {
+            personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
+        }
+        Person sender = personBuilder.build();
+
+        NotificationCompat.MessagingStyle style =
+            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
+                .setConversationTitle(roomName)
+                .addMessage(messageText, System.currentTimeMillis(), sender);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(senderName)
-            .setContentText(messageText)
-            .setStyle(new NotificationCompat.BigTextStyle()
-                .setBigContentTitle(senderName)
-                .setSummaryText(roomName)
-                .bigText(messageText))
+            .setStyle(style)
+            // setLargeIcon controls the LEFT icon in collapsed view — overrides app icon
+            .setLargeIcon(roundedAvatar)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setGroup(GROUP_KEY)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setNumber(1);
-
-        // Large icon (avatar) shows in both collapsed and expanded views with BigTextStyle
-        if (roundedAvatar != null) {
-            builder.setLargeIcon(roundedAvatar);
-        }
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
@@ -131,11 +137,15 @@ public class NotificationHelper {
         PendingIntent pi = PendingIntent.getActivity(context, tag.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        Person sender = new Person.Builder().setName(title).build();
+        NotificationCompat.MessagingStyle style =
+            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
+                .setConversationTitle(title)
+                .addMessage(body, System.currentTimeMillis(), sender);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+            .setStyle(style)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH);
