@@ -191,14 +191,10 @@ public class SyncService extends Service {
             // Notify on every new message event, skip own messages
             for (int j = events.length() - 1; j >= 0; j--) {
                 JSONObject event = events.getJSONObject(j);
-                if (!"m.room.message".equals(event.optString("type"))) continue;
-
-                JSONObject content = event.optJSONObject("content");
-                if (content == null) continue;
-
-                // Skip edits/replies that are just relation events
-                String msgtype = content.optString("msgtype", "");
-                if (msgtype.isEmpty()) continue;
+                String evType = event.optString("type");
+                boolean isMessage   = "m.room.message".equals(evType);
+                boolean isEncrypted = "m.room.encrypted".equals(evType);
+                if (!isMessage && !isEncrypted) continue;
 
                 String senderFull = event.optString("sender", "");
                 // Skip own messages
@@ -210,7 +206,18 @@ public class SyncService extends Service {
                     sender = colon > 0 ? sender.substring(1, colon) : sender.substring(1);
                 }
 
-                String body = content.optString("body", "New message");
+                String body;
+                if (isEncrypted) {
+                    // Can't decrypt — show a generic notification
+                    body = "New message";
+                } else {
+                    JSONObject content = event.optJSONObject("content");
+                    if (content == null) continue;
+                    String msgtype = content.optString("msgtype", "");
+                    if (msgtype.isEmpty()) continue;
+                    body = content.optString("body", "New message");
+                }
+
                 notifHelper.showNotification(roomName, sender + ": " + body, roomId);
                 break; // One notif per room per sync
             }
