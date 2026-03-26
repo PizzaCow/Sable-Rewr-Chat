@@ -131,6 +131,38 @@ public class MatrixProfileCache {
         if (name != null && !name.isEmpty()) roomNames.put(roomId, name);
     }
 
+    /** Returns room avatar Bitmap, or null if none set (e.g. DMs) */
+    public Bitmap getRoomAvatar(String roomId) {
+        Bitmap cached = avatars.get("room:" + roomId);
+        if (cached != null) return cached;
+
+        try {
+            String url = tokenStore.getHomeserver()
+                + "/_matrix/client/v3/rooms/" + encode(roomId) + "/state/m.room.avatar";
+            JSONObject res = getJson(url);
+            if (res == null) return null;
+
+            String mxcUrl = res.optString("url", null);
+            if (mxcUrl == null || !mxcUrl.startsWith("mxc://")) return null;
+
+            String mxc = mxcUrl.substring(6);
+            int slash = mxc.indexOf('/');
+            if (slash < 0) return null;
+            String server = mxc.substring(0, slash);
+            String mediaId = mxc.substring(slash + 1);
+            String thumbUrl = tokenStore.getHomeserver()
+                + "/_matrix/client/v1/media/thumbnail/" + server + "/" + mediaId
+                + "?width=96&height=96&method=crop";
+
+            Bitmap bmp = downloadBitmap(thumbUrl);
+            if (bmp != null) {
+                avatars.put("room:" + roomId, bmp);
+                return bmp;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     /** Returns avatar Bitmap for a user ID, or null if unavailable */
     public Bitmap getAvatar(String userId) {
         Bitmap cached = avatars.get(userId);

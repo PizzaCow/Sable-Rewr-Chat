@@ -47,7 +47,7 @@ public class NotificationHelper {
      * @param isEncrypted Whether the message is encrypted (show generic body)
      */
     public void showMessage(String roomId, String roomName, String senderName,
-                            Bitmap senderAvatar, String body, boolean isEncrypted) {
+                            Bitmap senderAvatar, Bitmap roomAvatar, String body, boolean isEncrypted) {
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pi = PendingIntent.getActivity(context, roomId.hashCode(), intent,
@@ -88,7 +88,11 @@ public class NotificationHelper {
         // Only alert on individual notifications, not the summary
         builder.setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
 
-        // Group summary — use latest sender's avatar so it shows when collapsed
+        // Group summary — use room avatar if available, else sender avatar
+        Bitmap summaryIcon = roomAvatar != null
+            ? AvatarHelper.forNotification(roomAvatar)
+            : roundedAvatar;
+
         NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setGroup(GROUP_KEY)
@@ -97,8 +101,8 @@ public class NotificationHelper {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_LOW);
 
-        if (roundedAvatar != null) {
-            summary.setLargeIcon(roundedAvatar);
+        if (summaryIcon != null) {
+            summary.setLargeIcon(summaryIcon);
         }
 
         try {

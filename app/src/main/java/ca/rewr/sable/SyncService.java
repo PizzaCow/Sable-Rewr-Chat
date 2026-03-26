@@ -218,11 +218,12 @@ public class SyncService extends Service {
                     body = content.optString("body", null);
                 }
 
-                // Fetch display name and avatar
+                // Fetch display name, sender avatar, and room avatar
                 String displayName = profileCache.getDisplayName(senderFull);
-                android.graphics.Bitmap avatar = profileCache.getAvatar(senderFull);
+                android.graphics.Bitmap senderAvatar = profileCache.getAvatar(senderFull);
+                android.graphics.Bitmap roomAvatar = profileCache.getRoomAvatar(roomId);
 
-                notifHelper.showMessage(roomId, roomName, displayName, avatar,
+                notifHelper.showMessage(roomId, roomName, displayName, senderAvatar, roomAvatar,
                     body != null ? body : "New message", isEncrypted);
                 break; // One notif per room per sync
             }
