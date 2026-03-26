@@ -4,12 +4,14 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.KeyEvent;
 import android.webkit.ConsoleMessage;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -24,10 +26,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
@@ -37,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraImageUri;
+    private String notificationShimJs;
 
     private final ActivityResultLauncher<Intent> fileChooserLauncher =
         registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -63,14 +71,20 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        notificationShimJs = loadAsset("notification_shim.js");
+
         webView = findViewById(R.id.webview);
         setupWebView();
         webView.loadUrl(SABLE_URL);
 
-        permissionLauncher.launch(new String[]{
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO
-        });
+        // Request permissions
+        List<String> perms = new ArrayList<>();
+        perms.add(Manifest.permission.CAMERA);
+        perms.add(Manifest.permission.RECORD_AUDIO);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            perms.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+        permissionLauncher.launch(perms.toArray(new String[0]));
     }
 
     private void setupWebView() {
@@ -86,6 +100,9 @@ public class MainActivity extends AppCompatActivity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setUserAgentString(settings.getUserAgentString() + " SableAndroid/1.0");
 
+        // Inject notification bridge
+        webView.addJavascriptInterface(new WebNotificationInterface(this), "AndroidNotifications");
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -93,10 +110,17 @@ public class MainActivity extends AppCompatActivity {
                 if (url.startsWith("https://chat.rewr.ca") || url.startsWith("https://rewr.chat")) {
                     return false;
                 }
-                // Open external links in browser
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                 startActivity(intent);
                 return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // Inject the notification shim after page load
+                if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
+                    view.evaluateJavascript(notificationShimJs, null);
+                }
             }
         });
 
@@ -116,15 +140,12 @@ public class MainActivity extends AppCompatActivity {
                                               FileChooserParams params) {
                 filePathCallback = callback;
                 Intent chooser = params.createIntent();
-
-                // Also offer camera
                 try {
                     File photoFile = createImageFile();
                     cameraImageUri = FileProvider.getUriForFile(MainActivity.this,
                         getPackageName() + ".fileprovider", photoFile);
                     Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                     cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
-
                     Intent picker = Intent.createChooser(chooser, "Choose file");
                     picker.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
                     fileChooserLauncher.launch(picker);
@@ -139,6 +160,21 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
+    }
+
+    private String loadAsset(String filename) {
+        try {
+            InputStream is = getAssets().open(filename);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+            return sb.toString();
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     private File createImageFile() throws IOException {
