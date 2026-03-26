@@ -93,10 +93,13 @@ public class NotificationHelper {
             int notifId = (CHANNEL_ID + roomId).hashCode();
             nm.notify(notifId, builder.build());
 
-            // Only post a group summary when 2+ notifications are active
-            // (so a single notification shows standalone with its avatar)
-            int activeCount = nm.getActiveNotifications().size();
-            if (activeCount >= 2) {
+            // Count only active message notifications (exclude service notification)
+            long messageNotifCount = nm.getActiveNotifications().stream()
+                .filter(n -> CHANNEL_ID.equals(n.getNotification().getChannelId())
+                    && n.getId() != GROUP_SUMMARY_ID)
+                .count();
+
+            if (messageNotifCount >= 2) {
                 Bitmap summaryIcon = roomAvatar != null
                     ? AvatarHelper.forNotification(roomAvatar)
                     : roundedAvatar;
@@ -111,6 +114,9 @@ public class NotificationHelper {
 
                 if (summaryIcon != null) summary.setLargeIcon(summaryIcon);
                 nm.notify(GROUP_SUMMARY_ID, summary.build());
+            } else {
+                // Cancel any leftover summary so the single notif shows standalone
+                nm.cancel(GROUP_SUMMARY_ID);
             }
         } catch (SecurityException ignored) {}
     }
