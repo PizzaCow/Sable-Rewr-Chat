@@ -16,6 +16,8 @@ public class NotificationHelper {
 
     public static final String CHANNEL_ID = "sable_messages";
     private static final String CHANNEL_NAME = "Messages";
+    private static final String GROUP_KEY = "ca.rewr.sable.MESSAGES";
+    private static final int GROUP_SUMMARY_ID = 0;
 
     private final Context context;
 
@@ -75,16 +77,25 @@ public class NotificationHelper {
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setGroup(GROUP_KEY)
             .setNumber(1);
 
-        // Use rounded avatar as large icon
         if (roundedAvatar != null) {
             builder.setLargeIcon(roundedAvatar);
         }
 
+        // Group summary (required for bundling on Android 7+)
+        NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setGroup(GROUP_KEY)
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW);
+
         try {
-            NotificationManagerCompat.from(context).notify(
-                (CHANNEL_ID + roomId).hashCode(), builder.build());
+            NotificationManagerCompat nm = NotificationManagerCompat.from(context);
+            nm.notify((CHANNEL_ID + roomId).hashCode(), builder.build());
+            nm.notify(GROUP_SUMMARY_ID, summary.build());
         } catch (SecurityException ignored) {}
     }
 

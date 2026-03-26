@@ -253,9 +253,12 @@ public class SyncService extends Service {
 
     private void createServiceChannel() {
         NotificationChannel channel = new NotificationChannel(
-            CHANNEL_ID, "Background Sync", NotificationManager.IMPORTANCE_LOW);
+            CHANNEL_ID, "Background Sync", NotificationManager.IMPORTANCE_MIN);
         channel.setDescription("Keeps Sable connected for instant notifications");
         channel.setShowBadge(false);
+        channel.setSound(null, null);
+        channel.enableVibration(false);
+        channel.enableLights(false);
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (nm != null) nm.createNotificationChannel(channel);
     }
@@ -272,7 +275,8 @@ public class SyncService extends Service {
             .setContentIntent(pi)
             .setOngoing(true)
             .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .build();
     }
 }
