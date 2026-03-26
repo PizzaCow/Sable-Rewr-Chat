@@ -88,27 +88,30 @@ public class NotificationHelper {
         // Only alert on individual notifications, not the summary
         builder.setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
 
-        // Group summary — use room avatar if available, else sender avatar
-        Bitmap summaryIcon = roomAvatar != null
-            ? AvatarHelper.forNotification(roomAvatar)
-            : roundedAvatar;
-
-        NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setGroup(GROUP_KEY)
-            .setGroupSummary(true)
-            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW);
-
-        if (summaryIcon != null) {
-            summary.setLargeIcon(summaryIcon);
-        }
-
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-            nm.notify((CHANNEL_ID + roomId).hashCode(), builder.build());
-            nm.notify(GROUP_SUMMARY_ID, summary.build());
+            int notifId = (CHANNEL_ID + roomId).hashCode();
+            nm.notify(notifId, builder.build());
+
+            // Only post a group summary when 2+ notifications are active
+            // (so a single notification shows standalone with its avatar)
+            int activeCount = nm.getActiveNotifications().size();
+            if (activeCount >= 2) {
+                Bitmap summaryIcon = roomAvatar != null
+                    ? AvatarHelper.forNotification(roomAvatar)
+                    : roundedAvatar;
+
+                NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setGroup(GROUP_KEY)
+                    .setGroupSummary(true)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_LOW);
+
+                if (summaryIcon != null) summary.setLargeIcon(summaryIcon);
+                nm.notify(GROUP_SUMMARY_ID, summary.build());
+            }
         } catch (SecurityException ignored) {}
     }
 
