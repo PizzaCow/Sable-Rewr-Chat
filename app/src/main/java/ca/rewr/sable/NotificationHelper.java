@@ -49,6 +49,7 @@ public class NotificationHelper {
                             boolean isEncrypted, boolean isDm) {
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra("room_id", roomId);
         PendingIntent pi = PendingIntent.getActivity(context, roomId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 

@@ -78,6 +78,9 @@ public class MainActivity extends AppCompatActivity {
         setupWebView();
         webView.loadUrl(SABLE_URL);
 
+        // Navigate to room if opened from notification
+        handleNotificationIntent(getIntent());
+
         // Start persistent sync service for instant notifications
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
 
@@ -213,6 +216,29 @@ public class MainActivity extends AppCompatActivity {
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         webView.restoreState(savedInstanceState);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleNotificationIntent(intent);
+    }
+
+    private void handleNotificationIntent(Intent intent) {
+        if (intent == null) return;
+        String roomId = intent.getStringExtra("room_id");
+        if (roomId == null || roomId.isEmpty()) return;
+
+        // Delay slightly to let Sable's React app finish mounting
+        webView.postDelayed(() -> {
+            String js = "(function() {" +
+                "  var roomId = '" + roomId.replace("'", "\\'") + "';" +
+                "  try {" +
+                "    window.location.hash = '/room/' + roomId;" +
+                "  } catch(e) {}" +
+                "})();";
+            webView.evaluateJavascript(js, null);
+        }, 1500);
     }
 
     @Override
