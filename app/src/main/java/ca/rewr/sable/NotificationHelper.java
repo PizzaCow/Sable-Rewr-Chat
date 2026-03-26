@@ -61,34 +61,39 @@ public class NotificationHelper {
 
         String messageText = isEncrypted ? "New message" : body;
 
-        // Build Person with avatar for MessagingStyle (expanded bubble)
-        Person.Builder personBuilder = new Person.Builder().setName(senderName);
-        if (roundedAvatar != null) {
-            personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
-        }
-        Person sender = personBuilder.build();
-
-        // DMs: show sender name as title, no conversation title needed
-        // Groups: show room name as title, sender name appears on the message bubble
-        NotificationCompat.MessagingStyle style =
-            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
-                .setConversationTitle(isDm ? null : roomName)
-                .setGroupConversation(!isDm)
-                .addMessage(messageText, System.currentTimeMillis(), sender);
-
         // Large icon: DMs use sender avatar, groups use room avatar (or sender as fallback)
         Bitmap largeIcon = isDm ? roundedAvatar : (roomAvatar != null ? AvatarHelper.forNotification(roomAvatar) : roundedAvatar);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setStyle(style)
-            .setLargeIcon(largeIcon)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setGroup(GROUP_KEY)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setNumber(1);
+
+        if (largeIcon != null) builder.setLargeIcon(largeIcon);
+
+        if (isDm) {
+            // DM: plain notification — setLargeIcon reliably shows in collapsed view
+            builder.setContentTitle(senderName)
+                   .setContentText(messageText)
+                   .setStyle(new NotificationCompat.BigTextStyle()
+                       .bigText(messageText)
+                       .setSummaryText(roomName));
+        } else {
+            // Group: MessagingStyle with room name as header
+            Person.Builder personBuilder = new Person.Builder().setName(senderName);
+            if (roundedAvatar != null) personBuilder.setIcon(IconCompat.createWithBitmap(roundedAvatar));
+            Person sender = personBuilder.build();
+
+            builder.setStyle(new NotificationCompat.MessagingStyle(
+                    new Person.Builder().setName("You").build())
+                .setConversationTitle(roomName)
+                .setGroupConversation(true)
+                .addMessage(messageText, System.currentTimeMillis(), sender));
+        }
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
