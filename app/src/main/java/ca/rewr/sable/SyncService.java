@@ -184,6 +184,15 @@ public class SyncService extends Service {
             String roomId = roomIds.getString(i);
             JSONObject room = join.getJSONObject(roomId);
 
+            // Check push rule evaluation results from Synapse.
+            // notification_count > 0 means at least one event passed the user's push rules.
+            // highlight_count > 0 means a mention/keyword rule fired.
+            // If both are 0, the user has muted this room or has no matching rules — skip it.
+            JSONObject unreadNotifs = room.optJSONObject("unread_notifications");
+            int notificationCount = unreadNotifs != null ? unreadNotifs.optInt("notification_count", 0) : 0;
+            int highlightCount = unreadNotifs != null ? unreadNotifs.optInt("highlight_count", 0) : 0;
+            if (notificationCount == 0) continue;
+
             JSONObject timeline = room.optJSONObject("timeline");
             if (timeline == null) continue;
             JSONArray events = timeline.optJSONArray("events");
@@ -238,7 +247,8 @@ public class SyncService extends Service {
                 int invitedCount = room.optInt("invited_member_count", 0);
                 boolean isDm = (joinedCount + invitedCount) <= 2;
 
-                notifHelper.showMessage(roomId, roomName, displayName, senderAvatar, roomAvatar,
+                String displayRoomName = (highlightCount > 0) ? "💬 " + roomName : roomName;
+                notifHelper.showMessage(roomId, displayRoomName, displayName, senderAvatar, roomAvatar,
                     body != null ? body : "New message", isEncrypted, isDm);
                 break; // One notif per room per sync
             }
