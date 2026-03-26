@@ -38,8 +38,8 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: Latest Build
-          body: "Latest debug build from main branch."
+          tag_name: v1.01
+          name: v1.01
+          body: "Sable Android v1.01"
           prerelease: false
           files: sable-android.apk
