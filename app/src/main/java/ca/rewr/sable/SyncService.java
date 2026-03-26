@@ -33,6 +33,7 @@ public class SyncService extends Service {
     private Thread syncThread;
     private TokenStore tokenStore;
     private NotificationHelper notifHelper;
+    private MatrixProfileCache profileCache;
 
 
     @Override
@@ -40,6 +41,7 @@ public class SyncService extends Service {
         super.onCreate();
         tokenStore = new TokenStore(this);
         notifHelper = new NotificationHelper(this);
+        profileCache = new MatrixProfileCache(this);
         createServiceChannel();
     }
 
@@ -186,7 +188,14 @@ public class SyncService extends Service {
             JSONArray events = timeline.optJSONArray("events");
             if (events == null) continue;
 
-            String roomName = getRoomName(room, roomId);
+            // Cache room name from sync state if present
+            String roomName = getRoomNameFromState(room);
+            if (roomName == null) {
+                roomName = profileCache.getRoomName(roomId);
+                profileCache.cacheRoomName(roomId, roomName);
+            } else {
+                profileCache.cacheRoomName(roomId, roomName);
+            }
 
             // Notify on every new message event, skip own messages
             for (int j = events.length() - 1; j >= 0; j--) {
@@ -200,31 +209,27 @@ public class SyncService extends Service {
                 // Skip own messages
                 if (!ownUserId.isEmpty() && senderFull.equals(ownUserId)) continue;
 
-                String sender = senderFull;
-                if (sender.startsWith("@")) {
-                    int colon = sender.indexOf(':');
-                    sender = colon > 0 ? sender.substring(1, colon) : sender.substring(1);
-                }
-
-                String body;
-                if (isEncrypted) {
-                    // Can't decrypt — show a generic notification
-                    body = "New message";
-                } else {
+                String body = null;
+                if (!isEncrypted) {
                     JSONObject content = event.optJSONObject("content");
                     if (content == null) continue;
                     String msgtype = content.optString("msgtype", "");
                     if (msgtype.isEmpty()) continue;
-                    body = content.optString("body", "New message");
+                    body = content.optString("body", null);
                 }
 
-                notifHelper.showNotification(roomName, sender + ": " + body, roomId);
+                // Fetch display name and avatar
+                String displayName = profileCache.getDisplayName(senderFull);
+                android.graphics.Bitmap avatar = profileCache.getAvatar(senderFull);
+
+                notifHelper.showMessage(roomId, roomName, displayName, avatar,
+                    body != null ? body : "New message", isEncrypted);
                 break; // One notif per room per sync
             }
         }
     }
 
-    private String getRoomName(JSONObject room, String fallback) {
+    private String getRoomNameFromState(JSONObject room) {
         try {
             JSONObject state = room.optJSONObject("state");
             if (state != null) {
@@ -243,12 +248,7 @@ public class SyncService extends Service {
                 }
             }
         } catch (Exception ignored) {}
-        // Shorten the room ID for display
-        if (fallback.startsWith("!")) {
-            int colon = fallback.indexOf(':');
-            if (colon > 0) return fallback.substring(1, Math.min(colon, 9)) + "…";
-        }
-        return fallback;
+        return null;
     }
 
     private void createServiceChannel() {
