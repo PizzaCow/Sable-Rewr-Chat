@@ -38,7 +38,42 @@ public class AvatarHelper {
     /** Slightly rounded — matches modern Android notification style */
     public static Bitmap forNotification(Bitmap src) {
         if (src == null) return null;
-        float radius = src.getWidth() * 0.2f; // 20% radius = slightly rounded
+        float radius = src.getWidth() * 0.2f;
         return roundCorners(src, radius);
+    }
+
+    /**
+     * Composites a small app badge onto the bottom-right of the avatar.
+     * Mimics WhatsApp/Telegram style notification icons.
+     */
+    public static Bitmap withAppBadge(Bitmap avatar, Bitmap appIcon) {
+        if (avatar == null) return null;
+        if (appIcon == null) return avatar;
+
+        int size = avatar.getWidth();
+        int badgeSize = size / 3; // badge is 1/3 the size of the avatar
+        int badgeX = size - badgeSize;
+        int badgeY = size - badgeSize;
+
+        Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        // Draw avatar
+        canvas.drawBitmap(avatar, 0, 0, null);
+
+        // Scale app icon to badge size
+        Bitmap scaledBadge = Bitmap.createScaledBitmap(appIcon, badgeSize, badgeSize, true);
+
+        // Draw white circle background for the badge
+        Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        bgPaint.setColor(android.graphics.Color.WHITE);
+        canvas.drawCircle(badgeX + badgeSize / 2f, badgeY + badgeSize / 2f,
+            badgeSize / 2f + 2, bgPaint);
+
+        // Draw badge as circle
+        Bitmap circleBadge = roundCorners(scaledBadge, badgeSize / 2f);
+        canvas.drawBitmap(circleBadge, badgeX, badgeY, null);
+
+        return output;
     }
 }

@@ -6,8 +6,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-
-import android.app.NotificationManager;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.service.notification.StatusBarNotification;
 
 import androidx.core.app.NotificationCompat;
@@ -62,7 +62,9 @@ public class NotificationHelper {
         String messageText = isEncrypted ? "New message" : body;
 
         // Large icon: DMs use sender avatar, groups use room avatar (or sender as fallback)
-        Bitmap largeIcon = isDm ? roundedAvatar : (roomAvatar != null ? AvatarHelper.forNotification(roomAvatar) : roundedAvatar);
+        Bitmap baseIcon = isDm ? roundedAvatar : (roomAvatar != null ? AvatarHelper.forNotification(roomAvatar) : roundedAvatar);
+        // Badge the Sable app icon onto the bottom-right corner
+        Bitmap largeIcon = AvatarHelper.withAppBadge(baseIcon, getAppIconBitmap());
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -123,6 +125,19 @@ public class NotificationHelper {
                 nm.cancel(GROUP_SUMMARY_ID);
             }
         } catch (SecurityException ignored) {}
+    }
+
+    private Bitmap getAppIconBitmap() {
+        try {
+            Drawable drawable = context.getPackageManager()
+                .getApplicationIcon(context.getPackageName());
+            Bitmap bmp = Bitmap.createBitmap(
+                drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bmp);
+            drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            drawable.draw(canvas);
+            return bmp;
+        } catch (Exception e) { return null; }
     }
 
     public void clearNotification(String roomId) {
