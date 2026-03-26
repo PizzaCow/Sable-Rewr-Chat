@@ -28,6 +28,12 @@ public class WebNotificationInterface {
         if (tag != null) helper.clearNotification(tag);
     }
 
+    /** Called from JS when the user navigates to a room */
+    @JavascriptInterface
+    public void setCurrentRoom(String roomId) {
+        MainActivity.currentRoomId = roomId;
+    }
+
     /** Called from the JS shim when it detects a Matrix access token */
     @JavascriptInterface
     public void saveSession(String accessToken, String homeserver) {

@@ -43,7 +43,10 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraImageUri;
     private String notificationShimJs;
-    private String pendingRoomId;
+
+    // Track foreground state and current room for notification suppression
+    public static boolean isInForeground = false;
+    public static String currentRoomId = null;
 
     private final ActivityResultLauncher<Intent> fileChooserLauncher =
         registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -73,14 +76,7 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webview);
         setupWebView();
 
-        // Check if launched from notification
-        String roomId = getIntent() != null ? getIntent().getStringExtra("room_id") : null;
-        if (roomId != null) {
-            // Load directly to the room URL
-            webView.loadUrl(SABLE_URL + "/#/room/" + roomId);
-        } else {
-            webView.loadUrl(SABLE_URL);
-        }
+        webView.loadUrl(SABLE_URL);
 
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
 
@@ -91,15 +87,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        isInForeground = true;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isInForeground = false;
+        CookieManager.getInstance().flush();
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent == null) return;
         String roomId = intent.getStringExtra("room_id");
         if (roomId == null) return;
+        // App already open — navigate via JS hash, no reload
+        navigateToRoom(roomId);
+    }
 
-        // App already open — navigate directly
-        String url = SABLE_URL + "/#/room/" + roomId;
-        webView.loadUrl(url);
+    private void navigateToRoom(String roomId) {
+        currentRoomId = roomId;
+        String safe = roomId.replace("\\", "\\\\").replace("'", "\\'");
+        webView.evaluateJavascript(
+            "window.location.hash = '/room/" + safe + "';", null);
     }
 
     private void setupWebView() {
@@ -136,6 +150,16 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
                     view.evaluateJavascript(notificationShimJs, null);
+                }
+                // Navigate to room from launch intent after page loads
+                Intent launchIntent = getIntent();
+                if (launchIntent != null) {
+                    String roomId = launchIntent.getStringExtra("room_id");
+                    if (roomId != null) {
+                        // Delay for React to mount
+                        view.postDelayed(() -> navigateToRoom(roomId), 1200);
+                        launchIntent.removeExtra("room_id"); // only do this once
+                    }
                 }
             }
         });
@@ -214,12 +238,6 @@ public class MainActivity extends AppCompatActivity {
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         return File.createTempFile("JPEG_" + timestamp + "_", ".jpg", storageDir);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        CookieManager.getInstance().flush();
     }
 
     @Override

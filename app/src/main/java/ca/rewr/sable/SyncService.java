@@ -206,8 +206,17 @@ public class SyncService extends Service {
                 if (!isMessage && !isEncrypted) continue;
 
                 String senderFull = event.optString("sender", "");
-                // Skip own messages
+
+                // Skip own messages — re-fetch whoami if we don't have it yet
+                if (ownUserId.isEmpty()) {
+                    fetchOwnUserId();
+                    ownUserId = tokenStore.getOwnUserId();
+                }
                 if (!ownUserId.isEmpty() && senderFull.equals(ownUserId)) continue;
+
+                // Skip if app is open and user is already in this room
+                if (MainActivity.isInForeground &&
+                    roomId.equals(MainActivity.currentRoomId)) continue;
 
                 String body = null;
                 if (!isEncrypted) {
