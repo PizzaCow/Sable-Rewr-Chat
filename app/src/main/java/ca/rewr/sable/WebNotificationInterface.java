@@ -24,6 +24,23 @@ public class WebNotificationInterface {
     }
 
     @JavascriptInterface
+    public void showRoomNotification(String title, String body, String tag, String roomId, String userId, String eventId) {
+        if (title == null) title = "Rewr.chat";
+        if (body == null) body = "";
+        if (tag == null) tag = String.valueOf(System.currentTimeMillis());
+        if (roomId == null) roomId = "";
+        if (userId == null) userId = "";
+        helper.showRoomNotification(title, body, tag, roomId, userId, eventId);
+    }
+
+    @JavascriptInterface
+    public void saveOwnUserId(String userId) {
+        if (userId != null && !userId.isEmpty()) {
+            tokenStore.saveOwnUserId(userId);
+        }
+    }
+
+    @JavascriptInterface
     public void closeNotification(String tag) {
         if (tag != null) helper.clearNotification(tag);
     }

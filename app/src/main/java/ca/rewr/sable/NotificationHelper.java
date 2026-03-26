@@ -149,6 +149,31 @@ public class NotificationHelper {
         messageHistory.clear(roomId);
     }
 
+    /** JS-bridge method for foreground notifications with room navigation */
+    public void showRoomNotification(String title, String body, String tag,
+                                     String roomId, String userId, String eventId) {
+        Intent intent = new Intent(context, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra("room_id", roomId);
+        intent.putExtra("user_id", userId);
+        PendingIntent pi = PendingIntent.getActivity(context, roomId.hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .setPriority(NotificationCompat.PRIORITY_HIGH);
+
+        try {
+            NotificationManagerCompat.from(context).notify(
+                (CHANNEL_ID + tag).hashCode(), builder.build());
+        } catch (SecurityException ignored) {}
+    }
+
     /** Legacy method for JS-bridge foreground notifications */
     public void showNotification(String title, String body, String tag) {
         Intent intent = new Intent(context, MainActivity.class);

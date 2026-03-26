@@ -45,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
     private String notificationShimJs;
     private boolean pageReady = false;
     private String pendingNavigationRoomId = null;
-    private boolean pendingNavigationIsDm = false;
+    private String pendingNavigationUserId = null;
 
     // Track foreground state and current room for notification suppression
     public static boolean isInForeground = false;
@@ -84,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
         // Queue room navigation if launched from notification
         if (getIntent() != null && getIntent().hasExtra("room_id")) {
             pendingNavigationRoomId = getIntent().getStringExtra("room_id");
-            pendingNavigationIsDm = getIntent().getBooleanExtra("is_dm", false);
+            pendingNavigationUserId = getIntent().getStringExtra("user_id");
         }
 
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
@@ -114,28 +114,34 @@ public class MainActivity extends AppCompatActivity {
         if (intent == null) return;
         String roomId = intent.getStringExtra("room_id");
         if (roomId == null) return;
-        boolean isDm = intent.getBooleanExtra("is_dm", false);
-        navigateToRoom(roomId, isDm);
+        String userId = intent.getStringExtra("user_id");
+        navigateToRoom(roomId, userId);
     }
 
-    private void navigateToRoom(String roomId, boolean isDm) {
+    private void navigateToRoom(String roomId, String userId) {
         currentRoomId = roomId;
         if (!pageReady) {
             pendingNavigationRoomId = roomId;
-            pendingNavigationIsDm = isDm;
+            pendingNavigationUserId = userId;
             return;
         }
-        // Use Sable's built-in /to/:user_id/:room_id/ deep-link route
-        // This is what the service worker uses and is the correct way to navigate
-        String ownUserId = new TokenStore(this).getOwnUserId();
         String safeRoomId = roomId.replace("\\", "\\\\").replace("'", "\\'");
-        String safeUserId = ownUserId.replace("\\", "\\\\").replace("'", "\\'");
-        String js = "(function() {" +
-            "  var roomId = encodeURIComponent('" + safeRoomId + "');" +
-            "  var userId = encodeURIComponent('" + safeUserId + "');" +
-            "  window.location.hash = '/to/' + userId + '/' + roomId + '/';" +
-            "})();";
+        String js;
+        if (userId != null && !userId.isEmpty()) {
+            String safeUserId = userId.replace("\\", "\\\\").replace("'", "\\'");
+            js = "(function() {" +
+                "  var path = '/to/' + encodeURIComponent('" + safeUserId + "') + '/' + encodeURIComponent('" + safeRoomId + "') + '/';" +
+                "  window.history.pushState({}, '', path);" +
+                "})();";
+        } else {
+            js = "(function() {" +
+                "  var path = '/home/' + encodeURIComponent('" + safeRoomId + "') + '/';" +
+                "  window.history.pushState({}, '', path);" +
+                "})();";
+        }
         webView.evaluateJavascript(js, null);
+        String afterPush = "window.dispatchEvent(new PopStateEvent('popstate', {state: window.history.state}));";
+        webView.evaluateJavascript(afterPush, null);
     }
 
     private void setupWebView() {
@@ -179,9 +185,10 @@ public class MainActivity extends AppCompatActivity {
                     // Handle any queued navigation
                     if (pendingNavigationRoomId != null) {
                         String roomId = pendingNavigationRoomId;
-                        boolean isDm = pendingNavigationIsDm;
+                        String userId = pendingNavigationUserId;
                         pendingNavigationRoomId = null;
-                        navigateToRoom(roomId, isDm);
+                        pendingNavigationUserId = null;
+                        navigateToRoom(roomId, userId);
                     }
                 }, 1500);
             }

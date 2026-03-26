@@ -6,7 +6,18 @@
     options = options || {};
     const body = options.body || '';
     const tag = options.tag || String(Date.now());
-    window.AndroidNotifications.showNotification(title, body, tag);
+    const data = options.data || {};
+    const roomId = (data && data.room_id) ? data.room_id : '';
+    const userId = (data && data.user_id) ? data.user_id : '';
+    const eventId = (data && data.event_id) ? data.event_id : '';
+    if (roomId) {
+      if (userId) {
+        window.AndroidNotifications.saveOwnUserId(userId);
+      }
+      window.AndroidNotifications.showRoomNotification(title, body, tag, roomId, userId, eventId);
+    } else {
+      window.AndroidNotifications.showNotification(title, body, tag);
+    }
     this.title = title;
     this.body = body;
     this.tag = tag;

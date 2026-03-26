@@ -1,6 +1,7 @@
 package ca.rewr.sable;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -130,7 +131,7 @@ public class SyncWorker extends Worker {
                 String body = content.optString("body", "New message");
                 String title = highlightCount > 0 ? "💬 " + roomName : roomName;
 
-                helper.showNotification(title, sender + ": " + body, roomId);
+                helper.showMessage(roomId, roomName, sender, null, null, body, false, false);
                 break; // One notification per room
             }
         }
