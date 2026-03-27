@@ -35,16 +35,11 @@ jobs:
           VERSION=$(grep versionName app/build.gradle | head -1 | awk '{print $2}' | tr -d '"')
           echo "name=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build Full (FCM) debug APK
-        run: ./gradlew assembleFullDebug
-
       - name: Build FOSS (UnifiedPush) debug APK
         run: ./gradlew assembleFossDebug
 
-      - name: Rename APKs
-        run: |
-          cp app/build/outputs/apk/full/debug/app-full-debug.apk rewr-chat.apk
-          cp app/build/outputs/apk/foss/debug/app-foss-debug.apk rewr-chat-foss.apk
+      - name: Rename APK
+        run: cp app/build/outputs/apk/foss/debug/app-foss-debug.apk rewr-chat.apk
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -52,17 +47,14 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            Two builds available:
-            - **rewr-chat.apk** — standard build (FCM push via Google)
-            - **rewr-chat-foss.apk** — Google-free build (UnifiedPush; requires a UP distributor like ntfy)
+            Google-free build — no Firebase, no Play Services.
+            Requires a UnifiedPush distributor (e.g. ntfy) for push notifications.
 
-            Changes in this release:
+            Changes since v1.07:
             - Separate notification channels: Direct Messages (high priority) and Group Rooms
-            - Quick reply and Mark as read actions directly from notifications
+            - Quick reply and Mark as read directly from the notification shade
             - App icon badge count (clears on open)
             - Deep links: to.rewr.chat opens in-app, SSO login completes in-app, matrix: URI support
-            - Google-free FOSS flavor with UnifiedPush support
-          prerelease: true
-          files: |
-            rewr-chat.apk
-            rewr-chat-foss.apk
+            - FOSS / Google-free push via UnifiedPush
+          prerelease: false
+          files: rewr-chat.apk
