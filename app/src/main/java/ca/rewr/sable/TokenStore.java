@@ -10,6 +10,7 @@ public class TokenStore {
     private static final String KEY_HOMESERVER = "homeserver";
     private static final String KEY_SINCE = "sync_since";
     private static final String KEY_USER_ID = "user_id";
+    private static final String KEY_UP_ENDPOINT = "up_endpoint";
 
     private final SharedPreferences prefs;
 
@@ -35,4 +36,13 @@ public class TokenStore {
     public void saveOwnUserId(String userId) { prefs.edit().putString(KEY_USER_ID, userId).apply(); }
 
     public boolean hasSession()     { return getAccessToken() != null; }
+
+    public String getUpEndpoint()   { return prefs.getString(KEY_UP_ENDPOINT, null); }
+    public void saveUpEndpoint(String endpoint) {
+        if (endpoint == null) {
+            prefs.edit().remove(KEY_UP_ENDPOINT).apply();
+        } else {
+            prefs.edit().putString(KEY_UP_ENDPOINT, endpoint).apply();
+        }
+    }
 }

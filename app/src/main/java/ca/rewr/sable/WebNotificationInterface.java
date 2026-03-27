@@ -56,12 +56,19 @@ public class WebNotificationInterface {
     public void saveSession(String accessToken, String homeserver) {
         if (accessToken != null && !accessToken.isEmpty()) {
             boolean wasEmpty = !tokenStore.hasSession();
-            tokenStore.saveSession(accessToken, homeserver != null ? homeserver : "https://matrix.rewr.ca");
+            String hs = homeserver != null ? homeserver : "https://matrix.rewr.ca";
+            tokenStore.saveSession(accessToken, hs);
             if (wasEmpty) {
                 // Debug: confirm token was captured
                 android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
                 main.post(() -> android.widget.Toast.makeText(
                     context, "Rewr.chat: sync connected ✓", android.widget.Toast.LENGTH_SHORT).show());
+            }
+            // If UP already registered before login, register pusher now
+            String upEndpoint = tokenStore.getUpEndpoint();
+            if (upEndpoint != null && !upEndpoint.isEmpty()) {
+                PusherRegistrar.register(context, upEndpoint, accessToken, hs);
+                SyncService.upActive = true;
             }
         }
     }

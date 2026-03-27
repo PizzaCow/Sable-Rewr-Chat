@@ -29,6 +29,7 @@ public class SyncService extends Service {
     // 30s long-poll timeout
     private static final int LONG_POLL_MS = 30000;
 
+    public static volatile boolean upActive = false;
     private volatile boolean running = false;
     private Thread syncThread;
     private TokenStore tokenStore;
@@ -130,7 +131,7 @@ public class SyncService extends Service {
                 if (nextBatch != null) {
                     boolean firstSync = (since == null);
                     tokenStore.saveSince(nextBatch);
-                    if (!firstSync) {
+                    if (!firstSync && !upActive) {
                         processNotifications(response);
                     }
                 }

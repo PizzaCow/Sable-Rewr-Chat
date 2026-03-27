@@ -89,6 +89,9 @@ public class MainActivity extends AppCompatActivity {
 
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
 
+        // Register with UnifiedPush distributor
+        org.unifiedpush.android.connector.UnifiedPush.registerAppWithDialog(this);
+
         // Only request notification permission upfront — mic/storage requested on demand
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
