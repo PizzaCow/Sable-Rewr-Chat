@@ -12,6 +12,8 @@ public class TokenStore {
     private static final String KEY_USER_ID = "user_id";
     private static final String KEY_FCM_TOKEN = "fcm_token";
     private static final String KEY_FCM_PUSHER_REGISTERED = "fcm_pusher_registered";
+    private static final String KEY_UP_ENDPOINT = "up_endpoint";
+    private static final String KEY_UP_PUSHER_REGISTERED = "up_pusher_registered";
 
     private final SharedPreferences prefs;
 
@@ -52,5 +54,17 @@ public class TokenStore {
     public boolean isFcmPusherRegistered() { return prefs.getBoolean(KEY_FCM_PUSHER_REGISTERED, false); }
     public void setFcmPusherRegistered(boolean registered) {
         prefs.edit().putBoolean(KEY_FCM_PUSHER_REGISTERED, registered).apply();
+    }
+
+    // ── UnifiedPush (FOSS flavor) ──────────────────────────────────────────────
+
+    public String getUpEndpoint() { return prefs.getString(KEY_UP_ENDPOINT, null); }
+    public void saveUpEndpoint(String endpoint) {
+        prefs.edit().putString(KEY_UP_ENDPOINT, endpoint).apply();
+    }
+
+    public boolean isUpPusherRegistered() { return prefs.getBoolean(KEY_UP_PUSHER_REGISTERED, false); }
+    public void setUpPusherRegistered(boolean registered) {
+        prefs.edit().putBoolean(KEY_UP_PUSHER_REGISTERED, registered).apply();
     }
 }

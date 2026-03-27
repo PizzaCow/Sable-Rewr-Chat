@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
-    id 'com.google.gms.google-services'
+    // google-services plugin applied only for the full (FCM) flavor
+    id 'com.google.gms.google-services' apply false
 }
 
 android {
@@ -11,8 +12,23 @@ android {
         applicationId "ca.rewr.sable"
         minSdk 26
         targetSdk 34
-        versionCode 8
-        versionName "1.07"
+        versionCode 9
+        versionName "1.08"
+    }
+
+    flavorDimensions "distribution"
+
+    productFlavors {
+        full {
+            dimension "distribution"
+            // FCM / Google Play flavor — apply google-services plugin
+            apply plugin: 'com.google.gms.google-services'
+        }
+        foss {
+            dimension "distribution"
+            // Google-free / UnifiedPush flavor
+            versionNameSuffix "-foss"
+        }
     }
 
     buildTypes {
@@ -32,6 +48,11 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.webkit:webkit:1.10.0'
     implementation 'androidx.work:work-runtime:2.9.0'
-    implementation platform('com.google.firebase:firebase-bom:33.1.0')
-    implementation 'com.google.firebase:firebase-messaging'
+
+    // Full flavor: Firebase / FCM
+    fullImplementation platform('com.google.firebase:firebase-bom:33.1.0')
+    fullImplementation 'com.google.firebase:firebase-messaging'
+
+    // FOSS flavor: UnifiedPush (JitPack)
+    fossImplementation 'org.unifiedpush.android:connector:2.4.0'
 }

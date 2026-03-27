@@ -32,14 +32,19 @@ jobs:
       - name: Get version name
         id: version
         run: |
-          VERSION=$(grep versionName app/build.gradle | awk '{print $2}' | tr -d '"')
+          VERSION=$(grep versionName app/build.gradle | head -1 | awk '{print $2}' | tr -d '"')
           echo "name=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Build Full (FCM) debug APK
+        run: ./gradlew assembleFullDebug
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk rewr-chat.apk
+      - name: Build FOSS (UnifiedPush) debug APK
+        run: ./gradlew assembleFossDebug
+
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/full/debug/app-full-debug.apk rewr-chat.apk
+          cp app/build/outputs/apk/foss/debug/app-foss-debug.apk rewr-chat-foss.apk
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -47,12 +52,17 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            - instant notifications when the app is closed
-            - DM notifications (shows "New message" to keep content private)
-            - SSO login now works properly
-            - stays logged in between sessions
-            - Rewr Chat icon
-            - circular profile pictures in notifications with app badge
-            - shows last 3 messages in notification
-          prerelease: false
-          files: rewr-chat.apk
+            Two builds available:
+            - **rewr-chat.apk** — standard build (FCM push via Google)
+            - **rewr-chat-foss.apk** — Google-free build (UnifiedPush; requires a UP distributor like ntfy)
+
+            Changes in this release:
+            - Separate notification channels: Direct Messages (high priority) and Group Rooms
+            - Quick reply and Mark as read actions directly from notifications
+            - App icon badge count (clears on open)
+            - Deep links: to.rewr.chat opens in-app, SSO login completes in-app, matrix: URI support
+            - Google-free FOSS flavor with UnifiedPush support
+          prerelease: true
+          files: |
+            rewr-chat.apk
+            rewr-chat-foss.apk
