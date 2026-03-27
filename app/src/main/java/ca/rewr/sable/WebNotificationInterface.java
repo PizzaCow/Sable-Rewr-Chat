@@ -64,12 +64,8 @@ public class WebNotificationInterface {
                 main.post(() -> android.widget.Toast.makeText(
                     context, "Rewr.chat: sync connected ✓", android.widget.Toast.LENGTH_SHORT).show());
             }
-            // If UP already registered before login, register pusher now
-            String upEndpoint = tokenStore.getUpEndpoint();
-            if (upEndpoint != null && !upEndpoint.isEmpty()) {
-                PusherRegistrar.register(context, upEndpoint, accessToken, hs);
-                SyncService.upActive = true;
-            }
+            // Register ntfy pusher now that we have a session
+            NtfyManager.ensureRegistered(context);
         }
     }
 }

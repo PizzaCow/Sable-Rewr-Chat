@@ -89,8 +89,8 @@ public class MainActivity extends AppCompatActivity {
 
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
 
-        // Register with UnifiedPush distributor
-        org.unifiedpush.android.connector.UnifiedPush.registerAppWithDialog(this);
+        // Register ntfy pusher if session already exists (e.g. app restart after login)
+        NtfyManager.ensureRegistered(this);
 
         // Only request notification permission upfront — mic/storage requested on demand
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

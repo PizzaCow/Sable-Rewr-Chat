@@ -29,9 +29,12 @@ public class SyncService extends Service {
     // 30s long-poll timeout
     private static final int LONG_POLL_MS = 30000;
 
+    // True when ntfy streaming is connected — suppresses SyncService notification firing
     public static volatile boolean upActive = false;
+
     private volatile boolean running = false;
     private Thread syncThread;
+    private Thread ntfyThread;
     private TokenStore tokenStore;
     private NotificationHelper notifHelper;
     private MatrixProfileCache profileCache;
@@ -55,15 +58,21 @@ public class SyncService extends Service {
             syncThread = new Thread(this::syncLoop, "SableSyncThread");
             syncThread.setDaemon(true);
             syncThread.start();
+
+            ntfyThread = new Thread(this::ntfyLoop, "SableNtfyThread");
+            ntfyThread.setDaemon(true);
+            ntfyThread.start();
         }
 
-        return START_STICKY; // Restart automatically if killed
+        return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         running = false;
+        upActive = false;
         if (syncThread != null) syncThread.interrupt();
+        if (ntfyThread != null) ntfyThread.interrupt();
         super.onDestroy();
     }
 
@@ -144,6 +153,131 @@ public class SyncService extends Service {
             }
         }
         Log.i(TAG, "Sync loop ended");
+    }
+
+    /**
+     * Connects to the ntfy streaming endpoint and fires local notifications on incoming messages.
+     * When connected, sets upActive=true to suppress SyncService's own notification logic.
+     * Retries on disconnect with a 5s back-off.
+     */
+    private void ntfyLoop() {
+        while (running) {
+            try {
+                // Wait for session + ntfy topic to be available
+                String streamUrl = NtfyManager.streamUrl(tokenStore);
+                if (streamUrl == null || !tokenStore.hasSession()) {
+                    Thread.sleep(10000);
+                    continue;
+                }
+
+                // Ensure pusher is registered with Synapse before we start listening
+                NtfyManager.ensureRegistered(this);
+
+                Log.i(TAG, "Connecting to ntfy stream: " + streamUrl);
+                URL url = new URL(streamUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Authorization", NtfyManager.NTFY_AUTH);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(0); // Infinite — this is a streaming connection
+
+                int code = conn.getResponseCode();
+                if (code != 200) {
+                    Log.w(TAG, "ntfy stream returned HTTP " + code + ", retrying in 10s");
+                    conn.disconnect();
+                    Thread.sleep(10000);
+                    continue;
+                }
+
+                upActive = true;
+                Log.i(TAG, "ntfy stream connected — SyncService notifications suppressed");
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                String line;
+                while (running && (line = reader.readLine()) != null) {
+                    if (line.trim().isEmpty()) continue;
+                    try {
+                        handleNtfyMessage(line);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to handle ntfy message: " + e.getMessage());
+                    }
+                }
+                conn.disconnect();
+                upActive = false;
+                Log.i(TAG, "ntfy stream disconnected, retrying in 5s");
+                Thread.sleep(5000);
+
+            } catch (InterruptedException e) {
+                break;
+            } catch (Exception e) {
+                upActive = false;
+                Log.e(TAG, "ntfy stream error: " + e.getMessage());
+                try { Thread.sleep(5000); } catch (InterruptedException ie) { break; }
+            }
+        }
+        upActive = false;
+        Log.i(TAG, "ntfy loop ended");
+    }
+
+    private void handleNtfyMessage(String line) throws Exception {
+        // ntfy streams JSON lines: {"id":"…","event":"message","message":"<Matrix push JSON>",…}
+        JSONObject ntfyEvent = new JSONObject(line);
+        // Skip keepalive events
+        if (!"message".equals(ntfyEvent.optString("event"))) return;
+
+        String rawMessage = ntfyEvent.optString("message", null);
+        if (rawMessage == null || rawMessage.isEmpty()) return;
+
+        // The message field contains the Matrix push notification JSON from Synapse
+        JSONObject push;
+        try {
+            push = new JSONObject(rawMessage);
+        } catch (Exception e) {
+            Log.d(TAG, "ntfy message is not JSON, skipping");
+            return;
+        }
+
+        JSONObject notification = push.optJSONObject("notification");
+        if (notification == null) return;
+
+        String roomId = notification.optString("room_id", null);
+        if (roomId == null || roomId.isEmpty()) return;
+
+        String sender = notification.optString("sender", "");
+        String ownUserId = tokenStore.getOwnUserId();
+        if (!ownUserId.isEmpty() && sender.equals(ownUserId)) return;
+
+        // Skip if app is open and user is already in this room
+        if (MainActivity.isInForeground && roomId.equals(MainActivity.currentRoomId)) return;
+
+        String roomName = notification.optString("room_name", null);
+        String senderDisplayName = notification.optString("sender_display_name", null);
+        boolean isEncrypted = "m.room.encrypted".equals(notification.optString("type", ""));
+
+        // Extract message body from content object
+        String body = null;
+        JSONObject content = notification.optJSONObject("content");
+        if (content != null) body = content.optString("body", null);
+
+        // Fall back to profile cache for missing display names / room names
+        if (roomName == null || roomName.isEmpty()) roomName = profileCache.getRoomName(roomId);
+        if (senderDisplayName == null || senderDisplayName.isEmpty()) senderDisplayName = profileCache.getDisplayName(sender);
+
+        android.graphics.Bitmap senderAvatar = profileCache.getAvatar(sender);
+        android.graphics.Bitmap roomAvatar = profileCache.getRoomAvatar(roomId);
+
+        // DM = 2 or fewer members; use member_count from notification if available, else avatar heuristic
+        int memberCount = notification.optInt("user_count", 0);
+        boolean isDm = memberCount > 0 ? memberCount <= 2 : (roomAvatar == null);
+
+        notifHelper.showMessage(
+            roomId,
+            roomName != null ? roomName : "Message",
+            senderDisplayName != null ? senderDisplayName : sender,
+            senderAvatar, roomAvatar,
+            body != null ? body : (isEncrypted ? "Encrypted message" : "New message"),
+            isEncrypted, isDm
+        );
     }
 
     private void fetchOwnUserId() {
