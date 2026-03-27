@@ -12,7 +12,7 @@ import java.util.Map;
  */
 public class MessageHistory {
 
-    private static final int MAX_MESSAGES = 3;
+    private static final int MAX_MESSAGES = 8;
 
     public static class Message {
         public final String senderName;

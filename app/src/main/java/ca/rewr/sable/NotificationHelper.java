@@ -11,6 +11,8 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.service.notification.StatusBarNotification;
 
+import android.app.Notification;
+
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
@@ -115,23 +117,46 @@ public class NotificationHelper {
         // ── Shortcut ───────────────────────────────────────────────────────────
         shortcutHelper.pushShortcut(roomId, isDm ? senderName : roomName, baseAvatar, !isDm);
 
-        // ── Message history ────────────────────────────────────────────────────
-        messageHistory.add(roomId, senderName, messageText, roundedSenderAvatar);
-
         // ── MessagingStyle ─────────────────────────────────────────────────────
-        NotificationCompat.MessagingStyle style =
-            new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build())
+        // Recover existing style from the active notification so messages accumulate
+        // across FCM pushes (process dies between invocations, in-memory history is gone).
+        Person selfPerson = new Person.Builder().setName("You").build();
+        NotificationCompat.MessagingStyle style = null;
+        int notifId = notifIdForRoom(roomId);
+
+        try {
+            NotificationManager systemNm =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (systemNm != null) {
+                for (StatusBarNotification sbn : systemNm.getActiveNotifications()) {
+                    if (sbn.getId() == notifId) {
+                        Notification existing = sbn.getNotification();
+                        style = NotificationCompat.MessagingStyle
+                            .extractMessagingStyleFromNotification(existing);
+                        break;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        if (style == null) {
+            // No active notification — seed from in-process history (SyncService path)
+            messageHistory.add(roomId, senderName, messageText, roundedSenderAvatar);
+            style = new NotificationCompat.MessagingStyle(selfPerson)
                 .setConversationTitle(isDm ? null : roomName)
                 .setGroupConversation(!isDm);
-
-        for (MessageHistory.Message msg : messageHistory.get(roomId)) {
-            Person.Builder pb = new Person.Builder().setName(msg.senderName);
-            if (msg.avatar != null) pb.setIcon(IconCompat.createWithBitmap(msg.avatar));
-            style.addMessage(msg.body, msg.timestamp, pb.build());
+            for (MessageHistory.Message msg : messageHistory.get(roomId)) {
+                Person.Builder pb = new Person.Builder().setName(msg.senderName);
+                if (msg.avatar != null) pb.setIcon(IconCompat.createWithBitmap(msg.avatar));
+                style.addMessage(msg.body, msg.timestamp, pb.build());
+            }
+        } else {
+            // Active notification found — append new message to recovered style
+            Person.Builder pb = new Person.Builder().setName(senderName);
+            if (roundedSenderAvatar != null) pb.setIcon(IconCompat.createWithBitmap(roundedSenderAvatar));
+            style.addMessage(messageText, System.currentTimeMillis(), pb.build());
+            messageHistory.add(roomId, senderName, messageText, roundedSenderAvatar);
         }
-
-        // ── Actions ────────────────────────────────────────────────────────────
-        int notifId = notifIdForRoom(roomId);
 
         // Mark as read
         Intent markReadIntent = new Intent(context, MarkReadReceiver.class);
