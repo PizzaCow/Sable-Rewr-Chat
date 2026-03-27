@@ -257,14 +257,26 @@ public class MainActivity extends AppCompatActivity {
                 String scheme = uri.getScheme();
                 String host = uri.getHost() != null ? uri.getHost() : "";
 
-                // account.rewr.ca (MAS) — SSO login and account management pages.
-                // Open in the device's default browser so the user gets a proper browser
-                // session. The OAuth callback (ca.rewr.sable://callback) is handled via
-                // the intent filter and routed back into the app automatically.
+                // account.rewr.ca (MAS) — split behaviour:
+                //
+                // "Manage account" URLs (kind=manage_account / action=...sessions_list etc.)
+                // → open in the device browser. No redirect back to the app is needed.
+                //
+                // SSO login URLs → keep in WebView. After auth, MAS redirects to
+                // https://chat.rewr.ca/login/rewr.ca?loginToken=... which must land in the
+                // WebView so Sable can exchange the token and complete sign-in.
                 if ("account.rewr.ca".equals(host)) {
-                    try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
-                    catch (Exception ignored) {}
-                    return true;
+                    String query = uri.getQuery();
+                    boolean isManageAccount = query != null && (
+                        query.contains("kind=manage_account") ||
+                        query.contains("action=org.matrix."));
+                    if (isManageAccount) {
+                        try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
+                        catch (Exception ignored) {}
+                        return true;
+                    }
+                    // SSO flow — stay in WebView
+                    return false;
                 }
 
                 // Allow all other rewr.ca / rewr.chat domains to load in-WebView
