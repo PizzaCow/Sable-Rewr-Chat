@@ -15,11 +15,12 @@
 
 
     <application
+        android:name=".SableApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Sable"
+        android:theme="@style/Theme.Sable.Splash"
         android:usesCleartextTraffic="false">
 
         <activity
@@ -70,6 +71,14 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Bubble activity for conversation bubbles (Android 11+) -->
+        <activity
+            android:name=".BubbleActivity"
+            android:allowEmbedded="true"
+            android:documentLaunchMode="always"
+            android:resizeableActivity="true"
+            android:exported="false" />
 
         <service
             android:name=".SyncService"
