@@ -47,7 +47,12 @@ public class SyncService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Start as foreground briefly (required by Android), then demote to background.
+        // FCM handles push — we only need the sync loop for next_batch token updates.
+        // Posting a silent foreground notification then immediately removing it avoids
+        // the persistent "Connected" notification in the shade.
         startForeground(FOREGROUND_ID, buildServiceNotification());
+        stopForeground(STOP_FOREGROUND_REMOVE);
 
         if (!running) {
             running = true;
@@ -313,7 +318,7 @@ public class SyncService extends Service {
         PendingIntent pi = PendingIntent.getActivity(this, 0, intent,
             PendingIntent.FLAG_IMMUTABLE);
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        return new NotificationCompat.Builder(this, CHANNEL_ID) // CHANNEL_ID = sable_sync_service_v2 (IMPORTANCE_MIN)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Rewr.chat")
             .setContentText("Connected")
@@ -323,6 +328,7 @@ public class SyncService extends Service {
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setGroup(NotificationHelper.GROUP_KEY)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build();
     }
 }
