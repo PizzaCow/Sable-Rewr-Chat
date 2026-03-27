@@ -20,9 +20,10 @@ import java.net.URL;
 public class MatrixProfileCache {
 
     private final TokenStore tokenStore;
-    private final LruCache<String, String> displayNames = new LruCache<>(200);
-    private final LruCache<String, String> roomNames    = new LruCache<>(200);
-    private final LruCache<String, Bitmap> avatars      = new LruCache<>(50);
+    private final LruCache<String, String>  displayNames = new LruCache<>(200);
+    private final LruCache<String, String>  roomNames    = new LruCache<>(200);
+    private final LruCache<String, Bitmap>  avatars      = new LruCache<>(50);
+    private final LruCache<String, Boolean> dmCache      = new LruCache<>(200);
 
     public MatrixProfileCache(Context context) {
         this.tokenStore = new TokenStore(context);
@@ -137,6 +138,33 @@ public class MatrixProfileCache {
     /** Cache a room name from sync state events */
     public void cacheRoomName(String roomId, String name) {
         if (name != null && !name.isEmpty()) roomNames.put(roomId, name);
+    }
+
+    /** Cache whether a room is a DM (from sync summary or caller-computed). */
+    public void cacheDm(String roomId, boolean isDm) {
+        dmCache.put(roomId, isDm);
+    }
+
+    /**
+     * Returns whether a room is a DM. Checks cache first, then fetches member count
+     * from Synapse (/joined_members). Falls back to false (treat as group) on error.
+     */
+    public boolean isDm(String roomId) {
+        Boolean cached = dmCache.get(roomId);
+        if (cached != null) return cached;
+
+        try {
+            String url = tokenStore.getHomeserver()
+                + "/_matrix/client/v3/rooms/" + encode(roomId) + "/joined_members";
+            JSONObject res = getJson(url);
+            if (res != null) {
+                JSONObject joined = res.optJSONObject("joined");
+                boolean dm = (joined != null && joined.length() <= 2);
+                dmCache.put(roomId, dm);
+                return dm;
+            }
+        } catch (Exception ignored) {}
+        return false;
     }
 
     /** Returns room avatar Bitmap, or null if none set (e.g. DMs) */

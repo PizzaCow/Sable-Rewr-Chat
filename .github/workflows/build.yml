@@ -50,7 +50,10 @@ jobs:
             Google-free build — no Firebase, no Play Services.
             Requires a UnifiedPush distributor (e.g. ntfy) for push notifications.
 
-            Changes since v1.07:
+            Changes in v1.081:
+            - Fix: group chat notifications now show the room name and room avatar instead of the sender's name and avatar
+
+            Changes in v1.08:
             - Separate notification channels: Direct Messages (high priority) and Group Rooms
             - Quick reply and Mark as read directly from the notification shade
             - App icon badge count (clears on open)

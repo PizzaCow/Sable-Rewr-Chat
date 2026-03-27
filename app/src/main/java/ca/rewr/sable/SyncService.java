@@ -247,10 +247,20 @@ public class SyncService extends Service {
                 android.graphics.Bitmap senderAvatar = profileCache.getAvatar(senderFull);
                 android.graphics.Bitmap roomAvatar = profileCache.getRoomAvatar(roomId);
 
-                // It's a DM if 2 or fewer members (joined + invited)
-                int joinedCount = room.optInt("joined_member_count", 0);
-                int invitedCount = room.optInt("invited_member_count", 0);
-                boolean isDm = (joinedCount + invitedCount) <= 2;
+                // Determine if this is a DM.
+                // Member counts live in room.summary["m.joined_member_count"] (not the room root).
+                // The summary is only sent when member counts change, so fall back to the profile
+                // cache (which will fetch from /joined_members on first sight of a room).
+                JSONObject summary = room.optJSONObject("summary");
+                boolean isDm;
+                if (summary != null && summary.has("m.joined_member_count")) {
+                    int joinedCount  = summary.optInt("m.joined_member_count", 0);
+                    int invitedCount = summary.optInt("m.invited_member_count", 0);
+                    isDm = (joinedCount + invitedCount) <= 2;
+                    profileCache.cacheDm(roomId, isDm);
+                } else {
+                    isDm = profileCache.isDm(roomId);
+                }
 
                 String displayRoomName = (highlightCount > 0) ? "💬 " + roomName : roomName;
                 String evId = event.optString("event_id", null);
