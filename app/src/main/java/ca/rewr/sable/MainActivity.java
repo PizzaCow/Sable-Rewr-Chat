@@ -150,6 +150,19 @@ public class MainActivity extends AppCompatActivity {
         String host = data.getHost();
         String uriStr = data.toString();
 
+        // SSO login callback: https://rewr.chat/login/rewr.ca?loginToken=...
+        // Opened by the system browser after MAS auth completes. Load into WebView
+        // so Sable can exchange the token and complete sign-in.
+        if ("https".equals(scheme) && ("rewr.chat".equals(host) || "chat.rewr.ca".equals(host))
+                && data.getPath() != null && data.getPath().startsWith("/login/")) {
+            if (pageReady) {
+                webView.loadUrl(uriStr);
+            } else {
+                pendingDeepLinkUrl = uriStr;
+            }
+            return true;
+        }
+
         if ("https".equals(scheme) && "to.rewr.chat".equals(host)) {
             // e.g. https://to.rewr.chat/#/@user:rewr.ca  or  https://to.rewr.chat/#/#room:rewr.ca
             // Just load the URL in the WebView — the to.rewr.chat page handles navigation into Sable
@@ -257,26 +270,22 @@ public class MainActivity extends AppCompatActivity {
                 String scheme = uri.getScheme();
                 String host = uri.getHost() != null ? uri.getHost() : "";
 
-                // account.rewr.ca (MAS) — split behaviour:
-                //
-                // "Manage account" URLs (kind=manage_account / action=...sessions_list etc.)
-                // → open in the device browser. No redirect back to the app is needed.
-                //
-                // SSO login URLs → keep in WebView. After auth, MAS redirects to
-                // https://chat.rewr.ca/login/rewr.ca?loginToken=... which must land in the
-                // WebView so Sable can exchange the token and complete sign-in.
+                // account.rewr.ca (MAS) — always open in system browser.
+                // SSO logins: browser handles auth, then MAS redirects to
+                // https://rewr.chat/login/rewr.ca?loginToken=... which is an App Link
+                // that brings the user back into the app so Sable can exchange the token.
                 if ("account.rewr.ca".equals(host)) {
-                    String query = uri.getQuery();
-                    boolean isManageAccount = query != null && (
-                        query.contains("kind=manage_account") ||
-                        query.contains("action=org.matrix."));
-                    if (isManageAccount) {
-                        try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
-                        catch (Exception ignored) {}
-                        return true;
-                    }
-                    // SSO flow — stay in WebView
-                    return false;
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
+                    catch (Exception ignored) {}
+                    return true;
+                }
+
+                // matrix.rewr.ca SSO redirect endpoint → open in system browser
+                // (e.g. /_matrix/client/v3/login/sso/redirect?redirectUrl=...)
+                if ("matrix.rewr.ca".equals(host) && url.contains("/login/sso/")) {
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
+                    catch (Exception ignored) {}
+                    return true;
                 }
 
                 // Allow all other rewr.ca / rewr.chat domains to load in-WebView

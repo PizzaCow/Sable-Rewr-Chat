@@ -42,6 +42,14 @@
                 <data android:scheme="https" android:host="to.rewr.chat" />
             </intent-filter>
 
+            <!-- SSO login callback: https://rewr.chat/login/* (App Link, autoVerify requires assetlinks.json) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="rewr.chat" android:pathPrefix="/login/" />
+            </intent-filter>
+
             <!-- SSO / OAuth redirect URI: ca.rewr.sable://callback -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

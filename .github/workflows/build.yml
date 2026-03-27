@@ -35,11 +35,19 @@ jobs:
           VERSION=$(grep versionName app/build.gradle | awk '{print $2}' | tr -d '"')
           echo "name=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/rewr-release.jks
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: rewr-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk rewr-chat.apk
+        run: cp app/build/outputs/apk/release/app-release.apk rewr-chat.apk
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -47,8 +55,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            - Fix: group chat notifications now show the room name and room avatar instead of the sender's name and avatar
-            - Notification channels (DM / Group), quick reply, mark as read, badge count, deep links
-            - FCM push via Sygnal
+            - SSO login now opens in the device browser; login token returned securely to the app
+            - Signed release build (stable App Link fingerprint)
           prerelease: false
           files: rewr-chat.apk
