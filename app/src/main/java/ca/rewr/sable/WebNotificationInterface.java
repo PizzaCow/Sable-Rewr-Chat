@@ -9,16 +9,21 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.util.Log;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
 import android.widget.Toast;
 
 import java.io.OutputStream;
 
 public class WebNotificationInterface {
 
+    private static final String TAG = "WebNotifInterface";
+
     private final NotificationHelper helper;
     private final TokenStore tokenStore;
     private final Context context;
+    private WebView webView;
 
     public WebNotificationInterface(Context context) {
         this.context = context.getApplicationContext();
@@ -26,9 +31,28 @@ public class WebNotificationInterface {
         this.tokenStore = new TokenStore(context);
     }
 
+    /** Set the WebView reference so we can check the current URL for origin validation. */
+    public void setWebView(WebView webView) {
+        this.webView = webView;
+    }
+
+    /**
+     * Checks whether the current WebView URL belongs to a trusted origin.
+     * Prevents rogue JS from calling sensitive bridge methods.
+     */
+    private boolean isTrustedOrigin() {
+        if (webView == null) return false;
+        String url = webView.getUrl();
+        if (url == null) return false;
+        for (String origin : Config.TRUSTED_ORIGINS) {
+            if (url.startsWith(origin)) return true;
+        }
+        return false;
+    }
+
     @JavascriptInterface
     public void showNotification(String title, String body, String tag) {
-        if (title == null) title = "Rewr.chat";
+        if (title == null) title = Config.APP_DISPLAY_NAME;
         if (body == null) body = "";
         if (tag == null) tag = String.valueOf(System.currentTimeMillis());
         helper.showNotification(title, body, tag);
@@ -36,7 +60,7 @@ public class WebNotificationInterface {
 
     @JavascriptInterface
     public void showRoomNotification(String title, String body, String tag, String roomId, String userId, String eventId) {
-        if (title == null) title = "Rewr.chat";
+        if (title == null) title = Config.APP_DISPLAY_NAME;
         if (body == null) body = "";
         if (tag == null) tag = String.valueOf(System.currentTimeMillis());
         if (roomId == null) roomId = "";
@@ -46,6 +70,10 @@ public class WebNotificationInterface {
 
     @JavascriptInterface
     public void saveOwnUserId(String userId) {
+        if (!isTrustedOrigin()) {
+            Log.w(TAG, "saveOwnUserId blocked — untrusted origin");
+            return;
+        }
         if (userId != null && !userId.isEmpty()) {
             tokenStore.saveOwnUserId(userId);
         }
@@ -114,12 +142,18 @@ public class WebNotificationInterface {
         }
     }
 
-    /** Called from the JS shim when it detects a Matrix access token */
+    /**
+     * Called from the JS shim when it detects a Matrix access token.
+     * Only accepts calls from trusted origins to prevent rogue JS injection.
+     */
     @JavascriptInterface
     public void saveSession(String accessToken, String homeserver) {
+        if (!isTrustedOrigin()) {
+            Log.w(TAG, "saveSession blocked — untrusted origin");
+            return;
+        }
         if (accessToken != null && !accessToken.isEmpty()) {
-            boolean wasEmpty = !tokenStore.hasSession();
-            String hs = homeserver != null ? homeserver : "https://matrix.rewr.ca";
+            String hs = homeserver != null ? homeserver : Config.DEFAULT_HOMESERVER;
             tokenStore.saveSession(accessToken, hs);
             // Register FCM pusher if token already available
             String fcmToken = tokenStore.getFcmToken();

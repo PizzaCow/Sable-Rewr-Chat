@@ -2,10 +2,16 @@ package ca.rewr.sable;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
+
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKeys;
 
 public class TokenStore {
 
-    private static final String PREFS = "sable_session";
+    private static final String TAG = "TokenStore";
+    private static final String PREFS = "sable_session_encrypted";
+    private static final String LEGACY_PREFS = "sable_session";
     private static final String KEY_ACCESS_TOKEN = "access_token";
     private static final String KEY_HOMESERVER = "homeserver";
     private static final String KEY_SINCE = "sync_since";
@@ -16,8 +22,48 @@ public class TokenStore {
     private final SharedPreferences prefs;
 
     public TokenStore(Context context) {
-        prefs = context.getApplicationContext()
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences encrypted = null;
+        try {
+            String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
+            encrypted = EncryptedSharedPreferences.create(
+                PREFS,
+                masterKeyAlias,
+                context.getApplicationContext(),
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to create EncryptedSharedPreferences, falling back to plain", e);
+            encrypted = context.getApplicationContext()
+                .getSharedPreferences(PREFS + "_fallback", Context.MODE_PRIVATE);
+        }
+        this.prefs = encrypted;
+
+        // Migrate from legacy unencrypted prefs (one-time)
+        migrateFromLegacy(context);
+    }
+
+    /**
+     * One-time migration: copies data from the old unencrypted SharedPreferences
+     * into encrypted storage, then clears the old prefs.
+     */
+    private void migrateFromLegacy(Context context) {
+        SharedPreferences legacy = context.getApplicationContext()
+            .getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE);
+        String legacyToken = legacy.getString(KEY_ACCESS_TOKEN, null);
+        if (legacyToken != null) {
+            Log.i(TAG, "Migrating session from unencrypted to encrypted storage");
+            prefs.edit()
+                .putString(KEY_ACCESS_TOKEN, legacyToken)
+                .putString(KEY_HOMESERVER, legacy.getString(KEY_HOMESERVER, Config.DEFAULT_HOMESERVER))
+                .putString(KEY_SINCE, legacy.getString(KEY_SINCE, null))
+                .putString(KEY_USER_ID, legacy.getString(KEY_USER_ID, ""))
+                .putString(KEY_FCM_TOKEN, legacy.getString(KEY_FCM_TOKEN, null))
+                .putBoolean(KEY_FCM_PUSHER_REGISTERED, legacy.getBoolean(KEY_FCM_PUSHER_REGISTERED, false))
+                .apply();
+            // Clear legacy data
+            legacy.edit().clear().apply();
+        }
     }
 
     public void saveSession(String accessToken, String homeserver) {
@@ -30,7 +76,7 @@ public class TokenStore {
     }
 
     public String getAccessToken() { return prefs.getString(KEY_ACCESS_TOKEN, null); }
-    public String getHomeserver()  { return prefs.getString(KEY_HOMESERVER, "https://matrix.rewr.ca"); }
+    public String getHomeserver()  { return prefs.getString(KEY_HOMESERVER, Config.DEFAULT_HOMESERVER); }
 
     public String getSince()            { return prefs.getString(KEY_SINCE, null); }
     public void saveSince(String since) { prefs.edit().putString(KEY_SINCE, since).apply(); }

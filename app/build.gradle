@@ -11,8 +11,8 @@ android {
         applicationId "ca.rewr.sable"
         minSdk 26
         targetSdk 34
-        versionCode 16
-        versionName "1.15"
+        versionCode 17
+        versionName "1.16"
     }
 
     signingConfigs {
@@ -26,9 +26,10 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             signingConfig signingConfigs.release
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -43,6 +44,7 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.10.0'
     implementation 'androidx.work:work-runtime:2.9.0'
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 
     implementation platform('com.google.firebase:firebase-bom:33.1.0')
     implementation 'com.google.firebase:firebase-messaging'

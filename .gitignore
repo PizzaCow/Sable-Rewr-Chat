@@ -5,3 +5,4 @@ app/build/
 .idea/
 local.properties
 rewr-release.jks
+app/google-services.json

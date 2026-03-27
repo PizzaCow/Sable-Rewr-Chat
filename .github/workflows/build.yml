@@ -35,6 +35,9 @@ jobs:
           VERSION=$(grep versionName app/build.gradle | awk '{print $2}' | tr -d '"')
           echo "name=v$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Decode google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > app/google-services.json
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/rewr-release.jks
 
@@ -55,7 +58,14 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            - SSO login now opens in the device browser; login token returned securely to the app
-            - Signed release build (stable App Link fingerprint)
+            ## v1.16 — Security & Stability
+            - Encrypted token storage (EncryptedSharedPreferences)
+            - Removed google-services.json from repo (now injected via CI secret)
+            - Origin validation on JS bridge saveSession()
+            - Fixed WebRTC permission race condition
+            - Enabled R8/ProGuard minification + shrinkResources
+            - Disabled third-party cookies
+            - Centralized all hardcoded URLs into Config class
+            - Extracted duplicate filename parsing helper
           prerelease: false
           files: rewr-chat.apk

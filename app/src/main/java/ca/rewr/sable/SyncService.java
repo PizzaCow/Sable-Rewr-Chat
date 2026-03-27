@@ -358,7 +358,7 @@ public class SyncService extends Service {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationHelper.CHANNEL_ID_MISC)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Rewr.chat — Session expired")
+            .setContentTitle(Config.APP_DISPLAY_NAME + " — Session expired")
             .setContentText("Tap to sign in again")
             .setAutoCancel(true)
             .setContentIntent(pi)
@@ -388,7 +388,7 @@ public class SyncService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID) // CHANNEL_ID = sable_sync_service_v2 (IMPORTANCE_MIN)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Rewr.chat")
+            .setContentTitle(Config.APP_DISPLAY_NAME)
             .setContentText("Connected")
             .setContentIntent(pi)
             .setOngoing(true)

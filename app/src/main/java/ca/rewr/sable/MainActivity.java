@@ -24,7 +24,6 @@ import android.webkit.WebViewClient;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
@@ -39,8 +38,6 @@ import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String SABLE_URL = "https://chat.rewr.ca";
-
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraImageUri;
@@ -49,6 +46,9 @@ public class MainActivity extends AppCompatActivity {
     private String pendingNavigationRoomId = null;
     private String pendingNavigationUserId = null;
     private String pendingDeepLinkUrl = null;
+
+    // Deferred WebRTC permission grant — held until Android permission result arrives
+    private PermissionRequest pendingPermissionRequest = null;
 
     // Track foreground state and current room for notification suppression
     public static boolean isInForeground = false;
@@ -70,7 +70,21 @@ public class MainActivity extends AppCompatActivity {
         });
 
     private final ActivityResultLauncher<String[]> permissionLauncher =
-        registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), perms -> {});
+        registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), perms -> {
+            // If we have a pending WebRTC permission request, resolve it now
+            if (pendingPermissionRequest != null) {
+                boolean allGranted = true;
+                for (Boolean granted : perms.values()) {
+                    if (!granted) { allGranted = false; break; }
+                }
+                if (allGranted) {
+                    pendingPermissionRequest.grant(pendingPermissionRequest.getResources());
+                } else {
+                    pendingPermissionRequest.deny();
+                }
+                pendingPermissionRequest = null;
+            }
+        });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webview);
         setupWebView();
 
-        webView.loadUrl(SABLE_URL);
+        webView.loadUrl(Config.SABLE_URL);
 
         // Queue room navigation if launched from notification or deep link
         if (getIntent() != null) {
@@ -104,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-        // Only request notification permission upfront — mic/storage requested on demand
+        // Only request notification permission upfront — mic/camera requested on demand
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
         }
@@ -153,9 +167,8 @@ public class MainActivity extends AppCompatActivity {
         String uriStr = data.toString();
 
         // SSO login callback: https://rewr.chat/login/rewr.ca?loginToken=...
-        // Opened by the system browser after MAS auth completes. Load into WebView
-        // so Sable can exchange the token and complete sign-in.
-        if ("https".equals(scheme) && ("rewr.chat".equals(host) || "chat.rewr.ca".equals(host))
+        if ("https".equals(scheme)
+                && (Config.HOST_REWR_CHAT.equals(host) || Config.HOST_CHAT.equals(host))
                 && data.getPath() != null && data.getPath().startsWith("/login/")) {
             if (pageReady) {
                 webView.loadUrl(uriStr);
@@ -165,9 +178,7 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
 
-        if ("https".equals(scheme) && "to.rewr.chat".equals(host)) {
-            // e.g. https://to.rewr.chat/#/@user:rewr.ca  or  https://to.rewr.chat/#/#room:rewr.ca
-            // Just load the URL in the WebView — the to.rewr.chat page handles navigation into Sable
+        if ("https".equals(scheme) && Config.HOST_DEEP_LINK.equals(host)) {
             if (pageReady) {
                 webView.loadUrl(uriStr);
             } else {
@@ -176,10 +187,8 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
 
-        if ("ca.rewr.sable".equals(scheme) && "callback".equals(host)) {
-            // SSO OAuth redirect — pass to WebView so Sable can complete the login flow
+        if (Config.CALLBACK_SCHEME.equals(scheme) && Config.CALLBACK_HOST.equals(host)) {
             if (pageReady) {
-                // Try to hand off to Sable's JS OAuth handler first; fall back to loading the URI
                 String safeUri = uriStr.replace("\\", "\\\\").replace("'", "\\'");
                 webView.evaluateJavascript(
                     "(function(){ if(window.__oauthCallback) window.__oauthCallback('" + safeUri + "'); })();",
@@ -191,18 +200,15 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if ("matrix".equals(scheme)) {
-            // e.g. matrix:r/roomalias:rewr.ca  or  matrix:u/userid:rewr.ca
-            String ssp = data.getSchemeSpecificPart(); // e.g. "r/roomalias:rewr.ca"
+            String ssp = data.getSchemeSpecificPart();
             if (ssp != null) {
                 String target = null;
                 if (ssp.startsWith("r/")) {
-                    // Room alias or ID → open in Sable via to.rewr.chat
                     String alias = ssp.substring(2);
-                    target = "https://to.rewr.chat/#/#" + alias;
+                    target = "https://" + Config.HOST_DEEP_LINK + "/#/#" + alias;
                 } else if (ssp.startsWith("u/")) {
-                    // User ID
                     String userId = ssp.substring(2);
-                    target = "https://to.rewr.chat/#/@" + userId;
+                    target = "https://" + Config.HOST_DEEP_LINK + "/#/@" + userId;
                 }
                 if (target != null) {
                     final String url = target;
@@ -245,6 +251,20 @@ public class MainActivity extends AppCompatActivity {
         webView.evaluateJavascript(afterPush, null);
     }
 
+    /**
+     * Extracts a filename from a Content-Disposition header value.
+     * Falls back to a timestamped name if extraction fails.
+     */
+    static String extractFilename(String contentDisposition) {
+        if (contentDisposition != null) {
+            int fnIdx = contentDisposition.indexOf("filename=");
+            if (fnIdx >= 0) {
+                return contentDisposition.substring(fnIdx + 9).replaceAll("[\"']", "").trim();
+            }
+        }
+        return "download_" + System.currentTimeMillis();
+    }
+
     private void setupWebView() {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -260,29 +280,22 @@ public class MainActivity extends AppCompatActivity {
 
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
-        cookieManager.setAcceptThirdPartyCookies(webView, true);
+        cookieManager.setAcceptThirdPartyCookies(webView, false);
 
-        webView.addJavascriptInterface(new WebNotificationInterface(this), "AndroidNotifications");
+        WebNotificationInterface notifInterface = new WebNotificationInterface(this);
+        notifInterface.setWebView(webView);
+        webView.addJavascriptInterface(notifInterface, "AndroidNotifications");
 
         webView.setDownloadListener(new DownloadListener() {
             @Override
             public void onDownloadStart(String url, String userAgent, String contentDisposition,
                                         String mimetype, long contentLength) {
                 if (url != null && url.startsWith("blob:")) {
-                    // Blob URLs are in-memory object URLs — XHR them via JS and send back as dataURL
                     String safeUrl = url.replace("\\", "\\\\").replace("'", "\\'");
                     String safeMime = (mimetype != null ? mimetype : "application/octet-stream")
                             .replace("\\", "\\\\").replace("'", "\\'");
-                    // Derive a filename from content-disposition or URL
-                    String filename = "download_" + System.currentTimeMillis();
-                    if (contentDisposition != null) {
-                        // Try to extract filename= from content-disposition
-                        int fnIdx = contentDisposition.indexOf("filename=");
-                        if (fnIdx >= 0) {
-                            filename = contentDisposition.substring(fnIdx + 9).replaceAll("[\"']", "").trim();
-                        }
-                    }
-                    String safeFilename = filename.replace("\\", "\\\\").replace("'", "\\'");
+                    String safeFilename = extractFilename(contentDisposition)
+                            .replace("\\", "\\\\").replace("'", "\\'");
 
                     String js = "(function() {" +
                         "  var xhr = new XMLHttpRequest();" +
@@ -299,18 +312,11 @@ public class MainActivity extends AppCompatActivity {
                         "})();";
                     webView.evaluateJavascript(js, null);
                 } else {
-                    // Regular URL — use DownloadManager
                     DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
                     request.setMimeType(mimetype);
                     request.setNotificationVisibility(
                             DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                    String filename = "download_" + System.currentTimeMillis();
-                    if (contentDisposition != null) {
-                        int fnIdx = contentDisposition.indexOf("filename=");
-                        if (fnIdx >= 0) {
-                            filename = contentDisposition.substring(fnIdx + 9).replaceAll("[\"']", "").trim();
-                        }
-                    }
+                    String filename = extractFilename(contentDisposition);
                     request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
                     request.addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url));
                     request.addRequestHeader("User-Agent", userAgent);
@@ -328,30 +334,26 @@ public class MainActivity extends AppCompatActivity {
                 String scheme = uri.getScheme();
                 String host = uri.getHost() != null ? uri.getHost() : "";
 
-                // account.rewr.ca (MAS) — always open in system browser.
-                // SSO logins: browser handles auth, then MAS redirects to
-                // https://rewr.chat/login/rewr.ca?loginToken=... which is an App Link
-                // that brings the user back into the app so Sable can exchange the token.
-                if ("account.rewr.ca".equals(host)) {
+                // account.rewr.ca (MAS) — always open in system browser
+                if (Config.HOST_ACCOUNT.equals(host)) {
                     try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
                     catch (Exception ignored) {}
                     return true;
                 }
 
                 // matrix.rewr.ca SSO redirect endpoint → open in system browser
-                // (e.g. /_matrix/client/v3/login/sso/redirect?redirectUrl=...)
-                if ("matrix.rewr.ca".equals(host) && url.contains("/login/sso/")) {
+                if (Config.HOST_MATRIX.equals(host) && url.contains("/login/sso/")) {
                     try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
                     catch (Exception ignored) {}
                     return true;
                 }
 
-                // Allow all other rewr.ca / rewr.chat domains to load in-WebView
+                // Allow all rewr.ca / rewr.chat domains in-WebView
                 if (url.contains("rewr.ca") || url.contains("rewr.chat")) return false;
-                // Allow our custom SSO callback scheme in-WebView
-                if ("ca.rewr.sable".equals(scheme)) return false;
+                // Allow custom SSO callback scheme in-WebView
+                if (Config.CALLBACK_SCHEME.equals(scheme)) return false;
 
-                // Everything else (external links) → system browser
+                // Everything else → system browser
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                 } catch (Exception ignored) {}
@@ -363,16 +365,13 @@ public class MainActivity extends AppCompatActivity {
                 if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
                     view.evaluateJavascript(notificationShimJs, null);
                 }
-                // Mark page ready after React has had time to mount
                 view.postDelayed(() -> {
                     pageReady = true;
-                    // Handle any queued deep link (takes priority over room navigation)
                     if (pendingDeepLinkUrl != null) {
                         String deepLink = pendingDeepLinkUrl;
                         pendingDeepLinkUrl = null;
                         webView.loadUrl(deepLink);
                     } else if (pendingNavigationRoomId != null) {
-                        // Handle any queued notification navigation
                         String roomId = pendingNavigationRoomId;
                         String userId = pendingNavigationUserId;
                         pendingNavigationRoomId = null;
@@ -386,26 +385,32 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                // Request mic permission on demand when WebRTC needs it
+                // Determine which Android permissions are needed
                 boolean needsMic = false;
+                boolean needsCamera = false;
                 for (String res : request.getResources()) {
-                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(res)) {
-                        needsMic = true;
-                        break;
-                    }
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(res)) needsMic = true;
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) needsCamera = true;
                 }
-                if (needsMic && ContextCompat.checkSelfPermission(
-                        MainActivity.this, Manifest.permission.RECORD_AUDIO)
-                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    permissionLauncher.launch(new String[]{Manifest.permission.RECORD_AUDIO});
-                    // Grant anyway — WebView will handle denial internally
+
+                boolean micGranted = !needsMic || ContextCompat.checkSelfPermission(
+                    MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED;
+                boolean cameraGranted = !needsCamera || ContextCompat.checkSelfPermission(
+                    MainActivity.this, Manifest.permission.CAMERA)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED;
+
+                if (micGranted && cameraGranted) {
+                    // Already have all needed permissions — grant immediately
+                    request.grant(request.getResources());
+                } else {
+                    // Store the request and ask for permissions — grant/deny in callback
+                    pendingPermissionRequest = request;
+                    java.util.List<String> needed = new java.util.ArrayList<>();
+                    if (!micGranted) needed.add(Manifest.permission.RECORD_AUDIO);
+                    if (!cameraGranted) needed.add(Manifest.permission.CAMERA);
+                    permissionLauncher.launch(needed.toArray(new String[0]));
                 }
-                if (ContextCompat.checkSelfPermission(
-                        MainActivity.this, Manifest.permission.CAMERA)
-                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    permissionLauncher.launch(new String[]{Manifest.permission.CAMERA});
-                }
-                request.grant(request.getResources());
             }
 
             @Override

@@ -111,12 +111,12 @@ public class FcmPushService extends FirebaseMessagingService {
         new Thread(() -> {
             try {
                 JSONObject data = new JSONObject();
-                data.put("url", "https://sygnal.rewr.ca/_matrix/push/v1/notify");
+                data.put("url", Config.SYGNAL_URL);
 
                 JSONObject body = new JSONObject();
                 body.put("kind", "http");
-                body.put("app_id", "ca.rewr.sable");
-                body.put("app_display_name", "Rewr.chat");
+                body.put("app_id", Config.APP_ID);
+                body.put("app_display_name", Config.APP_DISPLAY_NAME);
                 body.put("device_display_name", "Android");
                 body.put("pushkey", fcmToken);
                 body.put("lang", "en");
