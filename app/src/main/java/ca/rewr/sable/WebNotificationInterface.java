@@ -58,12 +58,6 @@ public class WebNotificationInterface {
             boolean wasEmpty = !tokenStore.hasSession();
             String hs = homeserver != null ? homeserver : "https://matrix.rewr.ca";
             tokenStore.saveSession(accessToken, hs);
-            if (wasEmpty) {
-                // Debug: confirm token was captured
-                android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
-                main.post(() -> android.widget.Toast.makeText(
-                    context, "Rewr.chat: sync connected ✓", android.widget.Toast.LENGTH_SHORT).show());
-            }
             // Register FCM pusher if token already available
             String fcmToken = tokenStore.getFcmToken();
             if (fcmToken != null && !fcmToken.isEmpty()) {
