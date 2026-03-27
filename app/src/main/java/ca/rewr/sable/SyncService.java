@@ -104,7 +104,7 @@ public class SyncService extends Service {
         // service startup contract), then immediately demote.
         // Push notifications are handled entirely by FCM + FcmPushService — we only
         // need this sync loop to keep next_batch up to date for Quick Reply / Mark as
-        // Read accuracy. The WatchdogWorker will restart us if we die.
+        // Read accuracy. The WatchdogWorker will restart us when the app is reopened.
         startForeground(FOREGROUND_ID, buildServiceNotification());
         stopForeground(STOP_FOREGROUND_REMOVE);
 
@@ -115,7 +115,10 @@ public class SyncService extends Service {
             syncThread.start();
         }
 
-        return START_STICKY;
+        // NOT_STICKY: don't restart after being killed. FCM handles background push;
+        // we don't want Android restarting the service after the app is closed, which
+        // would cause the "keeps crashing" system dialog if the restart fails.
+        return START_NOT_STICKY;
     }
 
     @Override
