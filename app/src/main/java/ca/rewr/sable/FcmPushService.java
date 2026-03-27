@@ -42,6 +42,7 @@ public class FcmPushService extends FirebaseMessagingService {
         String roomName = remoteMessage.getData().get("room_name");
         String senderDisplayName = remoteMessage.getData().get("sender_display_name");
         String type = remoteMessage.getData().get("type");
+        String userCountStr = remoteMessage.getData().get("user_count");
 
         if (roomId == null || roomId.isEmpty()) {
             Log.w(TAG, "FCM push missing room_id, ignoring");
@@ -74,7 +75,15 @@ public class FcmPushService extends FirebaseMessagingService {
             body = fetchEventBody(ts, roomId, eventId);
         }
 
-        boolean isDm = (roomAvatar == null);
+        // Use user_count from Sygnal payload for reliable DM detection.
+        // Fall back to room name heuristic: if Synapse sent a room_name it's almost certainly a group.
+        boolean isDm;
+        if (userCountStr != null) {
+            try { isDm = Integer.parseInt(userCountStr) <= 2; }
+            catch (NumberFormatException e) { isDm = (roomName == null || roomName.isEmpty()); }
+        } else {
+            isDm = (roomName == null || roomName.isEmpty());
+        }
 
         notifHelper.showMessage(
             roomId,
