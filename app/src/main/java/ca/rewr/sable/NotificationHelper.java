@@ -24,7 +24,7 @@ public class NotificationHelper {
 
     // Per-type channels
     public static final String CHANNEL_ID_DM    = "sable_dm";
-    public static final String CHANNEL_ID_GROUP = "sable_group";
+    public static final String CHANNEL_ID_GROUP = "sable_group_v2";
     public static final String CHANNEL_ID_MISC  = "sable_misc";
 
     /** Legacy channel ID kept for SyncService / re-login notifications already using it. */
@@ -56,8 +56,11 @@ public class NotificationHelper {
         dm.setShowBadge(true);
         nm.createNotificationChannel(dm);
 
+        // Delete old low-importance group channel if it exists (importance can't be changed after creation)
+        nm.deleteNotificationChannel("sable_group");
+
         NotificationChannel group = new NotificationChannel(
-            CHANNEL_ID_GROUP, "Group Rooms", NotificationManager.IMPORTANCE_DEFAULT);
+            CHANNEL_ID_GROUP, "Group Rooms", NotificationManager.IMPORTANCE_HIGH);
         group.setDescription("Messages in group rooms");
         group.enableVibration(true);
         group.setShowBadge(true);
@@ -195,7 +198,7 @@ public class NotificationHelper {
             .setLocusId(new LocusIdCompat(roomId))
             .setAutoCancel(true)
             .setContentIntent(tapPi)
-            .setPriority(isDm ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setGroup(GROUP_KEY)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .addAction(replyAction)
