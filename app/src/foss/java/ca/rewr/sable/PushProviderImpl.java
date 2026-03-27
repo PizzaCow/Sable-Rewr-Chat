@@ -46,6 +46,9 @@ public class PushProviderImpl implements PushProvider {
         // Also clear cached sync token so we do a fresh initial sync
         tokenStore.saveSince(null);
         registerNtfyPusher(context, tokenStore);
+        // Ensure service is running (may not have been started if init() ran before login)
+        Intent serviceIntent = new Intent(context, NtfyPushService.class);
+        ContextCompat.startForegroundService(context, serviceIntent);
     }
 
     /**
