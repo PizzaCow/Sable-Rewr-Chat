@@ -10,8 +10,8 @@ public class TokenStore {
     private static final String KEY_HOMESERVER = "homeserver";
     private static final String KEY_SINCE = "sync_since";
     private static final String KEY_USER_ID = "user_id";
-    private static final String KEY_NTFY_TOPIC = "ntfy_topic";
-    private static final String KEY_PUSHER_REGISTERED = "pusher_registered";
+    private static final String KEY_FCM_TOKEN = "fcm_token";
+    private static final String KEY_FCM_PUSHER_REGISTERED = "fcm_pusher_registered";
 
     private final SharedPreferences prefs;
 
@@ -25,7 +25,7 @@ public class TokenStore {
             .putString(KEY_ACCESS_TOKEN, accessToken)
             .putString(KEY_HOMESERVER, homeserver)
             // New session means the old pusher registration is no longer valid
-            .putBoolean(KEY_PUSHER_REGISTERED, false)
+            .putBoolean(KEY_FCM_PUSHER_REGISTERED, false)
             .apply();
     }
 
@@ -40,17 +40,17 @@ public class TokenStore {
 
     public boolean hasSession() { return getAccessToken() != null; }
 
-    /** Returns persisted ntfy topic UUID, or null if not yet generated. */
-    public String getNtfyTopic() { return prefs.getString(KEY_NTFY_TOPIC, null); }
+    /** Returns persisted FCM token, or null if not yet available. */
+    public String getFcmToken() { return prefs.getString(KEY_FCM_TOKEN, null); }
 
-    /** Persist the ntfy topic UUID (generated once, reused forever). */
-    public void saveNtfyTopic(String topic) {
-        prefs.edit().putString(KEY_NTFY_TOPIC, topic).apply();
+    /** Persist the FCM device token. */
+    public void saveFcmToken(String token) {
+        prefs.edit().putString(KEY_FCM_TOKEN, token).apply();
     }
 
-    /** Whether we have successfully registered the pusher with Synapse for the current session. */
-    public boolean isPusherRegistered() { return prefs.getBoolean(KEY_PUSHER_REGISTERED, false); }
-    public void setPusherRegistered(boolean registered) {
-        prefs.edit().putBoolean(KEY_PUSHER_REGISTERED, registered).apply();
+    /** Whether we have successfully registered the FCM pusher with Synapse for the current session. */
+    public boolean isFcmPusherRegistered() { return prefs.getBoolean(KEY_FCM_PUSHER_REGISTERED, false); }
+    public void setFcmPusherRegistered(boolean registered) {
+        prefs.edit().putBoolean(KEY_FCM_PUSHER_REGISTERED, registered).apply();
     }
 }

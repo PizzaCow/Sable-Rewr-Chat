@@ -89,8 +89,15 @@ public class MainActivity extends AppCompatActivity {
 
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
 
-        // Register ntfy pusher if session already exists (e.g. app restart after login)
-        NtfyManager.ensureRegistered(this);
+        // Initialize FCM token and register pusher if we have a session
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+            .addOnSuccessListener(token -> {
+                TokenStore ts = new TokenStore(this);
+                ts.saveFcmToken(token);
+                if (ts.hasSession() && !ts.isFcmPusherRegistered()) {
+                    FcmPushService.registerPusherFromContext(this, ts, token);
+                }
+            });
 
         // Only request notification permission upfront — mic/storage requested on demand
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

@@ -64,8 +64,11 @@ public class WebNotificationInterface {
                 main.post(() -> android.widget.Toast.makeText(
                     context, "Rewr.chat: sync connected ✓", android.widget.Toast.LENGTH_SHORT).show());
             }
-            // Register ntfy pusher now that we have a session
-            NtfyManager.ensureRegistered(context);
+            // Register FCM pusher if token already available
+            String fcmToken = tokenStore.getFcmToken();
+            if (fcmToken != null && !fcmToken.isEmpty()) {
+                FcmPushService.registerPusherFromContext(context, tokenStore, fcmToken);
+            }
         }
     }
 }

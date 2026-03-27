@@ -1,0 +1,106 @@
+# Sygnal deployment template — fill in FIREBASE_PROJECT_ID and mount the service account JSON
+# Apply with: kubectl apply -f sygnal.yaml
+# Secret must be created first: see sygnal-setup-notes.md
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sygnal
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sygnal-config
+  namespace: sygnal
+data:
+  sygnal.yaml: |
+    server:
+      bind_addresses: ['0.0.0.0']
+      port: 5000
+    log:
+      level: WARNING
+    apps:
+      ca.rewr.sable:
+        type: gcm
+        api_version: v1
+        project_id: FIREBASE_PROJECT_ID
+        service_account_file: /etc/sygnal/firebase-service-account.json
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sygnal
+  namespace: sygnal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sygnal
+  template:
+    metadata:
+      labels:
+        app: sygnal
+    spec:
+      containers:
+      - name: sygnal
+        image: ghcr.io/matrix-org/sygnal:latest
+        ports:
+        - containerPort: 5000
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sygnal
+        - name: firebase-creds
+          mountPath: /etc/sygnal/firebase-service-account.json
+          subPath: firebase-service-account.json
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+      volumes:
+      - name: config
+        configMap:
+          name: sygnal-config
+      - name: firebase-creds
+        secret:
+          secretName: sygnal-firebase-creds
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sygnal
+  namespace: sygnal
+spec:
+  selector:
+    app: sygnal
+  ports:
+  - port: 5000
+    targetPort: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sygnal
+  namespace: sygnal
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: push.rewr.ca
+    http:
+      paths:
+      - path: /_matrix/push
+        pathType: Prefix
+        backend:
+          service:
+            name: sygnal
+            port:
+              number: 5000
+  tls:
+  - hosts:
+    - push.rewr.ca
+    secretName: sygnal-tls
