@@ -267,9 +267,9 @@ public class MainActivity extends AppCompatActivity {
                     pageReady = true;
                     // Handle any queued deep link (takes priority over room navigation)
                     if (pendingDeepLinkUrl != null) {
-                        String url = pendingDeepLinkUrl;
+                        String deepLinkUrl = pendingDeepLinkUrl;
                         pendingDeepLinkUrl = null;
-                        webView.loadUrl(url);
+                        webView.loadUrl(deepLinkUrl);
                     } else if (pendingNavigationRoomId != null) {
                         // Handle any queued notification navigation
                         String roomId = pendingNavigationRoomId;
