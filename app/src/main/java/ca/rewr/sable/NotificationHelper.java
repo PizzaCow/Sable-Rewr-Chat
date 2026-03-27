@@ -229,7 +229,7 @@ public class NotificationHelper {
             if (messageNotifCount >= 2) {
                 NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_ID_MISC)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle("Rewr.chat")
+                    .setContentTitle(Config.APP_DISPLAY_NAME)
                     .setContentText(messageNotifCount + " new notifications")
                     .setNumber((int) messageNotifCount)
                     .setGroup(GROUP_KEY)
