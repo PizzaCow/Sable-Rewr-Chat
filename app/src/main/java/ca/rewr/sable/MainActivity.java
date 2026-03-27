@@ -1,6 +1,7 @@
 package ca.rewr.sable;
 
 import android.Manifest;
+import android.app.DownloadManager;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -9,6 +10,8 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.KeyEvent;
 import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
+import android.webkit.DownloadListener;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -17,7 +20,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.CookieManager;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -261,6 +263,62 @@ public class MainActivity extends AppCompatActivity {
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
         webView.addJavascriptInterface(new WebNotificationInterface(this), "AndroidNotifications");
+
+        webView.setDownloadListener(new DownloadListener() {
+            @Override
+            public void onDownloadStart(String url, String userAgent, String contentDisposition,
+                                        String mimetype, long contentLength) {
+                if (url != null && url.startsWith("blob:")) {
+                    // Blob URLs are in-memory object URLs — XHR them via JS and send back as dataURL
+                    String safeUrl = url.replace("\\", "\\\\").replace("'", "\\'");
+                    String safeMime = (mimetype != null ? mimetype : "application/octet-stream")
+                            .replace("\\", "\\\\").replace("'", "\\'");
+                    // Derive a filename from content-disposition or URL
+                    String filename = "download_" + System.currentTimeMillis();
+                    if (contentDisposition != null) {
+                        // Try to extract filename= from content-disposition
+                        int fnIdx = contentDisposition.indexOf("filename=");
+                        if (fnIdx >= 0) {
+                            filename = contentDisposition.substring(fnIdx + 9).replaceAll("[\"']", "").trim();
+                        }
+                    }
+                    String safeFilename = filename.replace("\\", "\\\\").replace("'", "\\'");
+
+                    String js = "(function() {" +
+                        "  var xhr = new XMLHttpRequest();" +
+                        "  xhr.open('GET', '" + safeUrl + "', true);" +
+                        "  xhr.responseType = 'blob';" +
+                        "  xhr.onload = function() {" +
+                        "    var reader = new FileReader();" +
+                        "    reader.onloadend = function() {" +
+                        "      AndroidNotifications.onBlobDownload(reader.result, '" + safeMime + "', '" + safeFilename + "');" +
+                        "    };" +
+                        "    reader.readAsDataURL(xhr.response);" +
+                        "  };" +
+                        "  xhr.send();" +
+                        "})();";
+                    webView.evaluateJavascript(js, null);
+                } else {
+                    // Regular URL — use DownloadManager
+                    DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                    request.setMimeType(mimetype);
+                    request.setNotificationVisibility(
+                            DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                    String filename = "download_" + System.currentTimeMillis();
+                    if (contentDisposition != null) {
+                        int fnIdx = contentDisposition.indexOf("filename=");
+                        if (fnIdx >= 0) {
+                            filename = contentDisposition.substring(fnIdx + 9).replaceAll("[\"']", "").trim();
+                        }
+                    }
+                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
+                    request.addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url));
+                    request.addRequestHeader("User-Agent", userAgent);
+                    DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                    if (dm != null) dm.enqueue(request);
+                }
+            }
+        });
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
