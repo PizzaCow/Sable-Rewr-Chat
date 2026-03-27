@@ -150,10 +150,8 @@ public class NtfyPushService extends Service {
                         eventType = null;
                     }
                 }
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                break;
             } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted()) break;
                 Log.w(TAG, "SSE error: " + e.getMessage());
                 if (conn != null) conn.disconnect();
                 sleepSeconds(5);
