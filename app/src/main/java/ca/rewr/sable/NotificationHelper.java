@@ -106,8 +106,11 @@ public class NotificationHelper {
         // largeIcon: room avatar for groups, sender avatar for DMs (shown collapsed)
         Bitmap baseAvatar = isDm ? senderAvatar : (roomAvatar != null ? roomAvatar : senderAvatar);
         Bitmap roundedAvatar = AvatarHelper.forNotification(baseAvatar);
-        // senderIcon: always the sender's avatar (shown per-message in expanded view)
-        Bitmap roundedSenderAvatar = AvatarHelper.forNotification(senderAvatar);
+        // senderIcon: always the sender's avatar (shown per-message in expanded view).
+        // Fall back to an initials avatar so each Person in MessagingStyle has a distinct
+        // icon — without this, Android falls back to the notification largeIcon (room pic).
+        Bitmap senderBitmap = senderAvatar != null ? senderAvatar : AvatarHelper.initialsAvatar(senderName);
+        Bitmap roundedSenderAvatar = AvatarHelper.forNotification(senderBitmap);
 
         // ── Shortcut ───────────────────────────────────────────────────────────
         shortcutHelper.pushShortcut(roomId, isDm ? senderName : roomName, baseAvatar, !isDm);

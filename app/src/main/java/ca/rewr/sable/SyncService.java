@@ -5,12 +5,23 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+import androidx.work.Worker;
+import androidx.work.WorkerParameters;
+
+import java.util.concurrent.TimeUnit;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,6 +47,47 @@ public class SyncService extends Service {
     private MatrixProfileCache profileCache;
 
 
+    // ── Watchdog Worker ────────────────────────────────────────────────────────
+
+    /**
+     * WorkManager worker that fires every 15 minutes (Android minimum).
+     * It simply checks if SyncService is supposed to be running and restarts it
+     * if it isn't. This is a belt-and-suspenders guard against aggressive battery
+     * optimisation killing the foreground service.
+     */
+    public static class WatchdogWorker extends Worker {
+        public WatchdogWorker(Context ctx, WorkerParameters params) {
+            super(ctx, params);
+        }
+
+        @Override
+        public Result doWork() {
+            TokenStore ts = new TokenStore(getApplicationContext());
+            if (ts.hasSession()) {
+                Intent svc = new Intent(getApplicationContext(), SyncService.class);
+                ContextCompat.startForegroundService(getApplicationContext(), svc);
+            }
+            return Result.success();
+        }
+    }
+
+    /** Schedule (or re-confirm) the periodic watchdog. Call from any entry point. */
+    public static void scheduleWatchdog(Context context) {
+        Constraints constraints = new Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build();
+        PeriodicWorkRequest watchdog = new PeriodicWorkRequest.Builder(
+                WatchdogWorker.class, 15, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .build();
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "sable_sync_watchdog",
+            ExistingPeriodicWorkPolicy.KEEP,
+            watchdog);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -43,24 +95,24 @@ public class SyncService extends Service {
         notifHelper = new NotificationHelper(this);
         profileCache = new MatrixProfileCache(this);
         createServiceChannel();
+        scheduleWatchdog(this);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Start as foreground briefly (required by Android), then demote to background.
-        // FCM handles push — we only need the sync loop for next_batch token updates.
-        // Posting a silent foreground notification then immediately removing it avoids
-        // the persistent "Connected" notification in the shade.
+        // Keep foreground so Android doesn't kill us when the app is closed.
+        // The notification is silent and IMPORTANCE_MIN so it sits at the very
+        // bottom of the shade and doesn't disturb the user.
         startForeground(FOREGROUND_ID, buildServiceNotification());
-        stopForeground(STOP_FOREGROUND_REMOVE);
 
         if (!running) {
             running = true;
             syncThread = new Thread(this::syncLoop, "SableSyncThread");
-            syncThread.setDaemon(true);
+            syncThread.setDaemon(false); // non-daemon so the thread isn't killed with the process
             syncThread.start();
         }
 
+        // START_STICKY: if killed by the OS, Android will restart us automatically
         return START_STICKY;
     }
 

@@ -13,6 +13,7 @@ public class BootReceiver extends BroadcastReceiver {
             if (store.hasSession()) {
                 Intent service = new Intent(context, SyncService.class);
                 ContextCompat.startForegroundService(context, service);
+                SyncService.scheduleWatchdog(context);
             }
         }
     }

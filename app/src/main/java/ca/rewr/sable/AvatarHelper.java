@@ -11,6 +11,46 @@ import android.graphics.RectF;
 public class AvatarHelper {
 
     /**
+     * Generates a circular avatar with the sender's initial on a deterministic colour.
+     * Used as a fallback when a user has no profile picture, so MessagingStyle always
+     * has a distinct icon per-sender and never falls back to the room's largeIcon.
+     */
+    public static Bitmap initialsAvatar(String name) {
+        int size = 96;
+        Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        // Deterministic colour palette (Material 700-ish)
+        int[] palette = {
+            0xFF1976D2, 0xFF388E3C, 0xFFD32F2F,
+            0xFF7B1FA2, 0xFFF57C00, 0xFF0097A7,
+            0xFF5D4037, 0xFF455A64
+        };
+        int color = palette[Math.abs((name != null ? name : "").hashCode()) % palette.length];
+
+        Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        bgPaint.setColor(color);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint);
+
+        String initial = (name != null && !name.isEmpty())
+            ? String.valueOf(name.charAt(0)).toUpperCase(java.util.Locale.ROOT)
+            : "?";
+
+        Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        textPaint.setColor(android.graphics.Color.WHITE);
+        textPaint.setTextSize(size * 0.45f);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+
+        android.graphics.Rect bounds = new android.graphics.Rect();
+        textPaint.getTextBounds(initial, 0, initial.length(), bounds);
+        float y = size / 2f + bounds.height() / 2f - bounds.bottom;
+
+        canvas.drawText(initial, size / 2f, y, textPaint);
+        return output;
+    }
+
+    /**
      * Returns a new Bitmap with rounded corners.
      * @param radius corner radius in pixels (e.g. 24 for slightly rounded, bitmap.width/2 for circle)
      */
