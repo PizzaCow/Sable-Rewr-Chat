@@ -90,8 +90,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
-
         // Initialize push backend (FCM in full flavor, UnifiedPush in foss flavor)
         new PushProviderImpl().init(this, new TokenStore(this));
 
