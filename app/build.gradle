@@ -53,8 +53,5 @@ dependencies {
     fullImplementation platform('com.google.firebase:firebase-bom:33.1.0')
     fullImplementation 'com.google.firebase:firebase-messaging'
 
-    // FOSS flavor: UnifiedPush (JitPack — com.github.UnifiedPush:android-connector)
-    fossImplementation 'com.github.UnifiedPush:android-connector:3.0.10'
-    // kotlin-stdlib needed to reference kotlin.Unit from Java in the UP callback
-    fossImplementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
+    // FOSS flavor: built-in ntfy push (no external dependencies needed — uses HttpURLConnection + SSE)
 }

@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FOSS flavor additions: UnifiedPush receiver -->
+<!-- FOSS flavor additions: built-in ntfy push service -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <service
+            android:name=".NtfyPushService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
         <receiver
-            android:name=".UnifiedPushService"
+            android:name=".BootReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="org.unifiedpush.android.connector.MESSAGE" />
-                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
-                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
-                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>

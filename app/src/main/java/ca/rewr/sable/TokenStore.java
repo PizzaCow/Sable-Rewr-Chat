@@ -13,6 +13,9 @@ public class TokenStore {
     private static final String KEY_FCM_PUSHER_REGISTERED = "fcm_pusher_registered";
     private static final String KEY_UP_ENDPOINT = "up_endpoint";
     private static final String KEY_UP_PUSHER_REGISTERED = "up_pusher_registered";
+    private static final String KEY_NTFY_TOPIC = "ntfy_topic";
+    private static final String KEY_NTFY_PUSHER_REGISTERED = "ntfy_pusher_registered";
+    private static final String KEY_SYNC_SINCE = "sync_since";
 
     private final SharedPreferences prefs;
 
@@ -52,7 +55,7 @@ public class TokenStore {
         prefs.edit().putBoolean(KEY_FCM_PUSHER_REGISTERED, registered).apply();
     }
 
-    // ── UnifiedPush (FOSS flavor) ──────────────────────────────────────────────
+    // ── UnifiedPush (FOSS flavor, legacy) ─────────────────────────────────────
 
     public String getUpEndpoint() { return prefs.getString(KEY_UP_ENDPOINT, null); }
     public void saveUpEndpoint(String endpoint) {
@@ -62,5 +65,33 @@ public class TokenStore {
     public boolean isUpPusherRegistered() { return prefs.getBoolean(KEY_UP_PUSHER_REGISTERED, false); }
     public void setUpPusherRegistered(boolean registered) {
         prefs.edit().putBoolean(KEY_UP_PUSHER_REGISTERED, registered).apply();
+    }
+
+    // ── ntfy built-in push (FOSS flavor) ──────────────────────────────────────
+
+    /**
+     * Returns the persisted ntfy topic UUID, generating and saving one if not yet present.
+     */
+    public String generateAndSaveNtfyTopic() {
+        String topic = prefs.getString(KEY_NTFY_TOPIC, null);
+        if (topic == null || topic.isEmpty()) {
+            topic = java.util.UUID.randomUUID().toString();
+            prefs.edit().putString(KEY_NTFY_TOPIC, topic).apply();
+        }
+        return topic;
+    }
+
+    public String getNtfyTopic() { return prefs.getString(KEY_NTFY_TOPIC, null); }
+
+    public boolean isNtfyPusherRegistered() { return prefs.getBoolean(KEY_NTFY_PUSHER_REGISTERED, false); }
+    public void setNtfyPusherRegistered(boolean registered) {
+        prefs.edit().putBoolean(KEY_NTFY_PUSHER_REGISTERED, registered).apply();
+    }
+
+    // ── Sync since token ───────────────────────────────────────────────────────
+
+    public String getSince() { return prefs.getString(KEY_SYNC_SINCE, null); }
+    public void saveSince(String since) {
+        prefs.edit().putString(KEY_SYNC_SINCE, since).apply();
     }
 }

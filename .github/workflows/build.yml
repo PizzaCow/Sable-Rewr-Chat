@@ -35,11 +35,16 @@ jobs:
           VERSION=$(grep versionName app/build.gradle | head -1 | awk '{print $2}' | tr -d '"')
           echo "name=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build FOSS (UnifiedPush) debug APK
+      - name: Build FOSS debug APK
         run: ./gradlew assembleFossDebug
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/foss/debug/app-foss-debug.apk rewr-chat.apk
+      - name: Build Full (FCM) debug APK
+        run: ./gradlew assembleFullDebug
+
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/foss/debug/app-foss-debug.apk rewr-chat-foss.apk
+          cp app/build/outputs/apk/full/debug/app-full-debug.apk rewr-chat-full.apk
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -47,8 +52,9 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            Google-free build — no Firebase, no Play Services.
-            Requires a UnifiedPush distributor (e.g. ntfy) for push notifications.
+            Two builds available:
+            - **rewr-chat-foss.apk** — Google-free, no Firebase, no Play Services. Built-in ntfy push (no setup required).
+            - **rewr-chat-full.apk** — FCM push via Firebase (requires Google Play Services).
 
             Changes in v1.081:
             - Fix: group chat notifications now show the room name and room avatar instead of the sender's name and avatar
@@ -58,6 +64,8 @@ jobs:
             - Quick reply and Mark as read directly from the notification shade
             - App icon badge count (clears on open)
             - Deep links: to.rewr.chat opens in-app, SSO login completes in-app, matrix: URI support
-            - FOSS / Google-free push via UnifiedPush
+            - FOSS: built-in ntfy push (no external app required)
           prerelease: false
-          files: rewr-chat.apk
+          files: |
+            rewr-chat-foss.apk
+            rewr-chat-full.apk
