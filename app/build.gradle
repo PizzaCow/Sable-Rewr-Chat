@@ -55,4 +55,6 @@ dependencies {
 
     // FOSS flavor: UnifiedPush (JitPack — com.github.UnifiedPush:android-connector)
     fossImplementation 'com.github.UnifiedPush:android-connector:3.0.10'
+    // kotlin-stdlib needed to reference kotlin.Unit from Java in the UP callback
+    fossImplementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
 }

@@ -5,6 +5,7 @@ import android.util.Log;
 
 import static org.unifiedpush.android.connector.ConstantsKt.INSTANCE_DEFAULT;
 import org.unifiedpush.android.connector.UnifiedPush;
+import kotlin.Unit;
 
 /**
  * FOSS flavor push provider — uses UnifiedPush.
@@ -34,6 +35,7 @@ public class PushProviderImpl implements PushProvider {
                 } else {
                     Log.w(TAG, "No UnifiedPush distributor available");
                 }
+                return Unit.INSTANCE;
             });
         } catch (Exception e) {
             Log.w(TAG, "UnifiedPush init failed: " + e.getMessage());
