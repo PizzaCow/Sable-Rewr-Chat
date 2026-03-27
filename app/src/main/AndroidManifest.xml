@@ -42,12 +42,13 @@
                 <data android:scheme="https" android:host="to.rewr.chat" />
             </intent-filter>
 
-            <!-- SSO login callback: https://rewr.chat/login/* (App Link, autoVerify requires assetlinks.json) -->
+            <!-- SSO login callback: https://rewr.chat/login/* and https://chat.rewr.ca/login/* -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="rewr.chat" android:pathPrefix="/login/" />
+                <data android:scheme="https" android:host="chat.rewr.ca" android:pathPrefix="/login/" />
             </intent-filter>
 
             <!-- SSO / OAuth redirect URI: ca.rewr.sable://callback -->
