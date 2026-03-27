@@ -100,19 +100,21 @@ public class SyncService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Keep foreground so Android doesn't kill us when the app is closed.
-        // The notification is silent and IMPORTANCE_MIN so it sits at the very
-        // bottom of the shade and doesn't disturb the user.
+        // Start as foreground briefly (required by Android to satisfy the foreground
+        // service startup contract), then immediately demote.
+        // Push notifications are handled entirely by FCM + FcmPushService — we only
+        // need this sync loop to keep next_batch up to date for Quick Reply / Mark as
+        // Read accuracy. The WatchdogWorker will restart us if we die.
         startForeground(FOREGROUND_ID, buildServiceNotification());
+        stopForeground(STOP_FOREGROUND_REMOVE);
 
         if (!running) {
             running = true;
             syncThread = new Thread(this::syncLoop, "SableSyncThread");
-            syncThread.setDaemon(false); // non-daemon so the thread isn't killed with the process
+            syncThread.setDaemon(true);
             syncThread.start();
         }
 
-        // START_STICKY: if killed by the OS, Android will restart us automatically
         return START_STICKY;
     }
 
