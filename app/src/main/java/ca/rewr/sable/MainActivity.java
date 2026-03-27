@@ -90,8 +90,17 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Initialize push backend (FCM in full flavor, UnifiedPush in foss flavor)
-        new PushProviderImpl().init(this, new TokenStore(this));
+        ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
+
+        // Initialize FCM token and register pusher if we have a session
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+            .addOnSuccessListener(token -> {
+                TokenStore ts = new TokenStore(this);
+                ts.saveFcmToken(token);
+                if (ts.hasSession() && !ts.isFcmPusherRegistered()) {
+                    FcmPushService.registerPusherFromContext(this, ts, token);
+                }
+            });
 
         // Only request notification permission upfront — mic/storage requested on demand
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -256,17 +265,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                // Inject fetch interceptor as early as possible so we catch tokens
-                // before the React bundle captures its own fetch reference
-                if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
-                    view.evaluateJavascript(notificationShimJs, null);
-                }
-            }
-
-            @Override
             public void onPageFinished(WebView view, String url) {
-                // Re-inject on page finished to ensure localStorage scan runs after React mounts
                 if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
                     view.evaluateJavascript(notificationShimJs, null);
                 }
@@ -275,9 +274,9 @@ public class MainActivity extends AppCompatActivity {
                     pageReady = true;
                     // Handle any queued deep link (takes priority over room navigation)
                     if (pendingDeepLinkUrl != null) {
-                        String deepLinkUrl = pendingDeepLinkUrl;
+                        String url = pendingDeepLinkUrl;
                         pendingDeepLinkUrl = null;
-                        webView.loadUrl(deepLinkUrl);
+                        webView.loadUrl(url);
                     } else if (pendingNavigationRoomId != null) {
                         // Handle any queued notification navigation
                         String roomId = pendingNavigationRoomId;

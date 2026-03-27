@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.application'
-    // google-services plugin applied only for the full (FCM) flavor
-    id 'com.google.gms.google-services' apply false
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -12,23 +11,8 @@ android {
         applicationId "ca.rewr.sable"
         minSdk 26
         targetSdk 34
-        versionCode 11
+        versionCode 9
         versionName "1.09"
-    }
-
-    flavorDimensions "distribution"
-
-    productFlavors {
-        full {
-            dimension "distribution"
-            // FCM / Google Play flavor — apply google-services plugin
-            apply plugin: 'com.google.gms.google-services'
-        }
-        foss {
-            dimension "distribution"
-            // Google-free / UnifiedPush flavor
-            versionNameSuffix "-foss"
-        }
     }
 
     buildTypes {
@@ -49,9 +33,6 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.10.0'
     implementation 'androidx.work:work-runtime:2.9.0'
 
-    // Full flavor: Firebase / FCM
-    fullImplementation platform('com.google.firebase:firebase-bom:33.1.0')
-    fullImplementation 'com.google.firebase:firebase-messaging'
-
-    // FOSS flavor: built-in ntfy push (no external dependencies needed — uses HttpURLConnection + SSE)
+    implementation platform('com.google.firebase:firebase-bom:33.1.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }

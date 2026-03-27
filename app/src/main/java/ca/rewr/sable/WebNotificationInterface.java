@@ -55,10 +55,14 @@ public class WebNotificationInterface {
     @JavascriptInterface
     public void saveSession(String accessToken, String homeserver) {
         if (accessToken != null && !accessToken.isEmpty()) {
+            boolean wasEmpty = !tokenStore.hasSession();
             String hs = homeserver != null ? homeserver : "https://matrix.rewr.ca";
             tokenStore.saveSession(accessToken, hs);
-            // Notify the push backend about the new session (flavor-specific)
-            new PushProviderImpl().onSessionChanged(context, tokenStore);
+            // Register FCM pusher if token already available
+            String fcmToken = tokenStore.getFcmToken();
+            if (fcmToken != null && !fcmToken.isEmpty()) {
+                FcmPushService.registerPusherFromContext(context, tokenStore, fcmToken);
+            }
         }
     }
 }
