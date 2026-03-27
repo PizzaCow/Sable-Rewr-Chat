@@ -255,9 +255,24 @@ public class MainActivity extends AppCompatActivity {
                 Uri uri = request.getUrl();
                 String url = uri.toString();
                 String scheme = uri.getScheme();
-                // Allow rewr.ca / rewr.chat domains and our custom SSO scheme to load in-WebView
+                String host = uri.getHost() != null ? uri.getHost() : "";
+
+                // account.rewr.ca (MAS) — SSO login and account management pages.
+                // Open in the device's default browser so the user gets a proper browser
+                // session. The OAuth callback (ca.rewr.sable://callback) is handled via
+                // the intent filter and routed back into the app automatically.
+                if ("account.rewr.ca".equals(host)) {
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
+                    catch (Exception ignored) {}
+                    return true;
+                }
+
+                // Allow all other rewr.ca / rewr.chat domains to load in-WebView
                 if (url.contains("rewr.ca") || url.contains("rewr.chat")) return false;
+                // Allow our custom SSO callback scheme in-WebView
                 if ("ca.rewr.sable".equals(scheme)) return false;
+
+                // Everything else (external links) → system browser
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                 } catch (Exception ignored) {}
