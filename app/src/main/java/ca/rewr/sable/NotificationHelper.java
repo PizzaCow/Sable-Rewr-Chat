@@ -103,14 +103,17 @@ public class NotificationHelper {
         String messageText = isEncrypted ? "New message" : body;
 
         // ── Avatars ────────────────────────────────────────────────────────────
+        // largeIcon: room avatar for groups, sender avatar for DMs (shown collapsed)
         Bitmap baseAvatar = isDm ? senderAvatar : (roomAvatar != null ? roomAvatar : senderAvatar);
         Bitmap roundedAvatar = AvatarHelper.forNotification(baseAvatar);
+        // senderIcon: always the sender's avatar (shown per-message in expanded view)
+        Bitmap roundedSenderAvatar = AvatarHelper.forNotification(senderAvatar);
 
         // ── Shortcut ───────────────────────────────────────────────────────────
         shortcutHelper.pushShortcut(roomId, isDm ? senderName : roomName, baseAvatar, !isDm);
 
         // ── Message history ────────────────────────────────────────────────────
-        messageHistory.add(roomId, senderName, messageText, roundedAvatar);
+        messageHistory.add(roomId, senderName, messageText, roundedSenderAvatar);
 
         // ── MessagingStyle ─────────────────────────────────────────────────────
         NotificationCompat.MessagingStyle style =

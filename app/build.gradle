@@ -11,8 +11,8 @@ android {
         applicationId "ca.rewr.sable"
         minSdk 26
         targetSdk 34
-        versionCode 9
-        versionName "1.09"
+        versionCode 10
+        versionName "1.091"
     }
 
     buildTypes {
