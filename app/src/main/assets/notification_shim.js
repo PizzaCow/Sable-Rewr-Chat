@@ -63,7 +63,7 @@
       for (var k of knownKeys) {
         var val = localStorage.getItem(k);
         if (val) {
-          var hs = localStorage.getItem('mx_hs_url') || localStorage.getItem('cinny_hs_url') || 'https://matrix.rewr.ca';
+          var hs = localStorage.getItem('mx_hs_url') || localStorage.getItem('cinny_hs_url') || localStorage.getItem('cinny_hs_base_url') || 'https://matrix.rewr.ca';
           saveIfFound(val, hs);
           return true;
         }
@@ -172,8 +172,16 @@
   // Start extraction attempts
   tryLocalStorage();
   tryIndexedDB();
-  setTimeout(function() { tryLocalStorage(); tryIndexedDB(); }, 3000);
-  setTimeout(function() { tryLocalStorage(); tryIndexedDB(); }, 8000);
+  setTimeout(function() { tryLocalStorage(); tryIndexedDB(); }, 2000);
+  setTimeout(function() { tryLocalStorage(); tryIndexedDB(); }, 5000);
+  setTimeout(function() { tryLocalStorage(); tryIndexedDB(); }, 10000);
+  setTimeout(function() { tryLocalStorage(); tryIndexedDB(); }, 20000);
+
+  // Keep polling until we find the token (covers slow login flows)
+  var pollInterval = setInterval(function() {
+    if (sessionSaved) { clearInterval(pollInterval); return; }
+    tryLocalStorage();
+  }, 3000);
 
   window.addEventListener('storage', function() {
     setTimeout(tryLocalStorage, 500);

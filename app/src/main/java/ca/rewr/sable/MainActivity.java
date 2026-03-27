@@ -256,7 +256,17 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                // Inject fetch interceptor as early as possible so we catch tokens
+                // before the React bundle captures its own fetch reference
+                if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
+                    view.evaluateJavascript(notificationShimJs, null);
+                }
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
+                // Re-inject on page finished to ensure localStorage scan runs after React mounts
                 if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
                     view.evaluateJavascript(notificationShimJs, null);
                 }
