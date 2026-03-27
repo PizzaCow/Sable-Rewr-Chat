@@ -91,7 +91,7 @@ public class FcmPushService extends FirebaseMessagingService {
             senderDisplayName,
             senderAvatar, roomAvatar,
             body != null ? body : (isEncrypted ? "Encrypted message" : "New message"),
-            isEncrypted, isDm
+            isEncrypted, isDm, eventId
         );
     }
 

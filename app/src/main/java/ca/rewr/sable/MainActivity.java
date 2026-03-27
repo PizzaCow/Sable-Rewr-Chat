@@ -46,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean pageReady = false;
     private String pendingNavigationRoomId = null;
     private String pendingNavigationUserId = null;
+    private String pendingDeepLinkUrl = null;
 
     // Track foreground state and current room for notification suppression
     public static boolean isInForeground = false;
@@ -81,10 +82,12 @@ public class MainActivity extends AppCompatActivity {
 
         webView.loadUrl(SABLE_URL);
 
-        // Queue room navigation if launched from notification
-        if (getIntent() != null && getIntent().hasExtra("room_id")) {
-            pendingNavigationRoomId = getIntent().getStringExtra("room_id");
-            pendingNavigationUserId = getIntent().getStringExtra("user_id");
+        // Queue room navigation if launched from notification or deep link
+        if (getIntent() != null) {
+            if (!handleDeepLinkIntent(getIntent()) && getIntent().hasExtra("room_id")) {
+                pendingNavigationRoomId = getIntent().getStringExtra("room_id");
+                pendingNavigationUserId = getIntent().getStringExtra("user_id");
+            }
         }
 
         ContextCompat.startForegroundService(this, new Intent(this, SyncService.class));
@@ -109,6 +112,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         isInForeground = true;
+        // Clear all notifications + badge when user opens the app
+        new NotificationHelper(this).clearAll();
     }
 
     @Override
@@ -122,10 +127,81 @@ public class MainActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent == null) return;
+
+        // Handle deep link intents (to.rewr.chat, matrix:, ca.rewr.sable://callback)
+        if (handleDeepLinkIntent(intent)) return;
+
+        // Notification tap: navigate to room
         String roomId = intent.getStringExtra("room_id");
         if (roomId == null) return;
         String userId = intent.getStringExtra("user_id");
         navigateToRoom(roomId, userId);
+    }
+
+    /**
+     * Handles incoming deep link intents.
+     * Returns true if the intent was a deep link and was handled (or queued).
+     */
+    private boolean handleDeepLinkIntent(Intent intent) {
+        Uri data = intent.getData();
+        if (data == null) return false;
+
+        String scheme = data.getScheme();
+        String host = data.getHost();
+        String uriStr = data.toString();
+
+        if ("https".equals(scheme) && "to.rewr.chat".equals(host)) {
+            // e.g. https://to.rewr.chat/#/@user:rewr.ca  or  https://to.rewr.chat/#/#room:rewr.ca
+            // Just load the URL in the WebView — the to.rewr.chat page handles navigation into Sable
+            if (pageReady) {
+                webView.loadUrl(uriStr);
+            } else {
+                pendingDeepLinkUrl = uriStr;
+            }
+            return true;
+        }
+
+        if ("ca.rewr.sable".equals(scheme) && "callback".equals(host)) {
+            // SSO OAuth redirect — pass to WebView so Sable can complete the login flow
+            if (pageReady) {
+                // Try to hand off to Sable's JS OAuth handler first; fall back to loading the URI
+                String safeUri = uriStr.replace("\\", "\\\\").replace("'", "\\'");
+                webView.evaluateJavascript(
+                    "(function(){ if(window.__oauthCallback) window.__oauthCallback('" + safeUri + "'); })();",
+                    null);
+            } else {
+                pendingDeepLinkUrl = uriStr;
+            }
+            return true;
+        }
+
+        if ("matrix".equals(scheme)) {
+            // e.g. matrix:r/roomalias:rewr.ca  or  matrix:u/userid:rewr.ca
+            String ssp = data.getSchemeSpecificPart(); // e.g. "r/roomalias:rewr.ca"
+            if (ssp != null) {
+                String target = null;
+                if (ssp.startsWith("r/")) {
+                    // Room alias or ID → open in Sable via to.rewr.chat
+                    String alias = ssp.substring(2);
+                    target = "https://to.rewr.chat/#/#" + alias;
+                } else if (ssp.startsWith("u/")) {
+                    // User ID
+                    String userId = ssp.substring(2);
+                    target = "https://to.rewr.chat/#/@" + userId;
+                }
+                if (target != null) {
+                    final String url = target;
+                    if (pageReady) {
+                        webView.loadUrl(url);
+                    } else {
+                        pendingDeepLinkUrl = url;
+                    }
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void navigateToRoom(String roomId, String userId) {
@@ -176,8 +252,12 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
+                Uri uri = request.getUrl();
+                String url = uri.toString();
+                String scheme = uri.getScheme();
+                // Allow rewr.ca / rewr.chat domains and our custom SSO scheme to load in-WebView
                 if (url.contains("rewr.ca") || url.contains("rewr.chat")) return false;
+                if ("ca.rewr.sable".equals(scheme)) return false;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                 } catch (Exception ignored) {}
@@ -192,8 +272,13 @@ public class MainActivity extends AppCompatActivity {
                 // Mark page ready after React has had time to mount
                 view.postDelayed(() -> {
                     pageReady = true;
-                    // Handle any queued navigation
-                    if (pendingNavigationRoomId != null) {
+                    // Handle any queued deep link (takes priority over room navigation)
+                    if (pendingDeepLinkUrl != null) {
+                        String url = pendingDeepLinkUrl;
+                        pendingDeepLinkUrl = null;
+                        webView.loadUrl(url);
+                    } else if (pendingNavigationRoomId != null) {
+                        // Handle any queued notification navigation
                         String roomId = pendingNavigationRoomId;
                         String userId = pendingNavigationUserId;
                         pendingNavigationRoomId = null;

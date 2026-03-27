@@ -27,10 +27,37 @@
             android:launchMode="singleTask"
             android:alwaysRetainTaskState="true"
             android:windowSoftInputMode="adjustResize">
+
+            <!-- Launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- to.rewr.chat deep links (App Link) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="to.rewr.chat" />
+            </intent-filter>
+
+            <!-- SSO / OAuth redirect URI: ca.rewr.sable://callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ca.rewr.sable" android:host="callback" />
+            </intent-filter>
+
+            <!-- matrix: URI scheme -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="matrix" />
+            </intent-filter>
+
         </activity>
 
         <service
@@ -51,6 +78,23 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification action receivers -->
+        <receiver
+            android:name=".MarkReadReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ca.rewr.sable.MARK_READ" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".ReplyReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ca.rewr.sable.REPLY" />
             </intent-filter>
         </receiver>
 

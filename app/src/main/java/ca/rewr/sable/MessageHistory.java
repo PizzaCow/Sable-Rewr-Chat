@@ -48,4 +48,8 @@ public class MessageHistory {
     public void clear(String roomId) {
         history.remove(roomId);
     }
+
+    public void clearAll() {
+        history.clear();
+    }
 }

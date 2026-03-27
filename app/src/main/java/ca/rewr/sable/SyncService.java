@@ -253,8 +253,9 @@ public class SyncService extends Service {
                 boolean isDm = (joinedCount + invitedCount) <= 2;
 
                 String displayRoomName = (highlightCount > 0) ? "💬 " + roomName : roomName;
+                String evId = event.optString("event_id", null);
                 notifHelper.showMessage(roomId, displayRoomName, displayName, senderAvatar, roomAvatar,
-                    body != null ? body : "New message", isEncrypted, isDm);
+                    body != null ? body : "New message", isEncrypted, isDm, evId);
                 break; // One notif per room per sync
             }
         }
@@ -288,7 +289,7 @@ public class SyncService extends Service {
         PendingIntent pi = PendingIntent.getActivity(this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationHelper.CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationHelper.CHANNEL_ID_MISC)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Rewr.chat — Session expired")
             .setContentText("Tap to sign in again")
