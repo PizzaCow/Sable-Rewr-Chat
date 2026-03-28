@@ -63,13 +63,15 @@ public class BubbleActivity extends AppCompatActivity {
         cookieManager.setAcceptThirdPartyCookies(webView, false);
 
         // Minimal JS bridge — setCurrentRoom so notification suppression works
-        WebNotificationInterface notifInterface = new WebNotificationInterface(this);
+        final WebNotificationInterface notifInterface = new WebNotificationInterface(this);
         notifInterface.setWebView(webView);
+        notifInterface.updateUrl(Config.SABLE_URL);
         webView.addJavascriptInterface(notifInterface, "AndroidNotifications");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
+                notifInterface.updateUrl(url);
                 // Inject notification shim
                 String shim = loadAsset("notification_shim.js");
                 if (shim != null && !shim.isEmpty()) {
