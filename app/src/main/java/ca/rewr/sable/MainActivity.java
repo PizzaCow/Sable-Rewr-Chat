@@ -26,6 +26,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.core.splashscreen.SplashScreen;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -88,7 +89,13 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Install splash screen — must be called before super.onCreate()
+        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
+
+        // Keep splash visible until the web app signals page ready
+        splashScreen.setKeepOnScreenCondition(() -> !pageReady);
+
         setContentView(R.layout.activity_main);
 
         notificationShimJs = loadAsset("notification_shim.js");

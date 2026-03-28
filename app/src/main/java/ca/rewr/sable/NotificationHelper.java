@@ -206,6 +206,28 @@ public class NotificationHelper {
 
         if (roundedAvatar != null) builder.setLargeIcon(roundedAvatar);
 
+        // ── Bubble metadata (Android 11+) ──────────────────────────────────────
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Intent bubbleIntent = new Intent(context, BubbleActivity.class);
+            bubbleIntent.putExtra(BubbleActivity.EXTRA_ROOM_ID, roomId);
+            if (isDm) bubbleIntent.putExtra(BubbleActivity.EXTRA_USER_ID, "");
+            PendingIntent bubblePi = PendingIntent.getActivity(context,
+                ("bubble_" + roomId).hashCode(), bubbleIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+
+            IconCompat bubbleIcon = roundedAvatar != null
+                ? IconCompat.createWithBitmap(roundedAvatar)
+                : IconCompat.createWithResource(context, R.drawable.ic_notification);
+
+            NotificationCompat.BubbleMetadata bubble = new NotificationCompat.BubbleMetadata.Builder(
+                    bubblePi, bubbleIcon)
+                .setDesiredHeight(600)
+                .setSuppressNotification(false)
+                .build();
+
+            builder.setBubbleMetadata(bubble);
+        }
+
         // ── Count active message notifications for badge + summary ─────────────
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);

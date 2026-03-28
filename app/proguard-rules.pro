@@ -19,6 +19,12 @@
 # Keep Config constants (referenced across the app)
 -keep class ca.rewr.sable.Config { *; }
 
+# Keep BubbleActivity (referenced in manifest + PendingIntent)
+-keep class ca.rewr.sable.BubbleActivity
+
+# Keep SableApplication (referenced in manifest)
+-keep class ca.rewr.sable.SableApplication
+
 # Firebase
 -keep class com.google.firebase.** { *; }
 -dontwarn com.google.firebase.**
