@@ -1,6 +1,8 @@
 package ca.rewr.sable;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -15,7 +17,8 @@ import java.io.InputStreamReader;
 
 /**
  * Lightweight activity displayed inside an Android conversation bubble.
- * Loads the Sable web app directly to the target room for quick replies.
+ * Loads the Sable web app then navigates to the target room via JS,
+ * mirroring how MainActivity.navigateToRoom() works.
  *
  * Shares WebView data (localStorage, IndexedDB, cookies) with MainActivity,
  * so the E2EE session and login state carry over — no extra login needed.
@@ -26,6 +29,9 @@ public class BubbleActivity extends AppCompatActivity {
     public static final String EXTRA_USER_ID = "user_id";
 
     private WebView webView;
+    private String pendingRoomId;
+    private String pendingUserId;
+    private boolean pageReady = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,25 +40,13 @@ public class BubbleActivity extends AppCompatActivity {
         webView = new WebView(this);
         setContentView(webView);
 
+        pendingRoomId = getIntent() != null ? getIntent().getStringExtra(EXTRA_ROOM_ID) : null;
+        pendingUserId = getIntent() != null ? getIntent().getStringExtra(EXTRA_USER_ID) : null;
+
         setupWebView();
 
-        String roomId = getIntent() != null ? getIntent().getStringExtra(EXTRA_ROOM_ID) : null;
-        String userId = getIntent() != null ? getIntent().getStringExtra(EXTRA_USER_ID) : null;
-
-        if (roomId != null && userId != null && !userId.isEmpty()) {
-            // DM — navigate via /to/<userId>/<roomId>/
-            String url = Config.SABLE_URL + "/to/"
-                + android.net.Uri.encode(userId) + "/"
-                + android.net.Uri.encode(roomId) + "/";
-            webView.loadUrl(url);
-        } else if (roomId != null) {
-            // Room — navigate via /home/<roomId>/
-            String url = Config.SABLE_URL + "/home/" + android.net.Uri.encode(roomId) + "/";
-            webView.loadUrl(url);
-        } else {
-            // Fallback — just load home
-            webView.loadUrl(Config.SABLE_URL);
-        }
+        // Always load the base URL — Cinny is an SPA, direct paths don't work
+        webView.loadUrl(Config.SABLE_URL);
     }
 
     private void setupWebView() {
@@ -68,21 +62,58 @@ public class BubbleActivity extends AppCompatActivity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, false);
 
+        // Minimal JS bridge — setCurrentRoom so notification suppression works
+        WebNotificationInterface notifInterface = new WebNotificationInterface(this);
+        notifInterface.setWebView(webView);
+        webView.addJavascriptInterface(notifInterface, "AndroidNotifications");
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                // Inject the notification shim so the bubble can update currentRoom
+                // Inject notification shim
                 String shim = loadAsset("notification_shim.js");
                 if (shim != null && !shim.isEmpty()) {
                     view.evaluateJavascript(shim, null);
                 }
+
+                // Wait for the SPA to initialize, then navigate to the room
+                if (!pageReady && pendingRoomId != null) {
+                    // Delay to let React/Cinny hydrate — same pattern as MainActivity
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        pageReady = true;
+                        navigateToRoom(pendingRoomId, pendingUserId);
+                    }, 1500);
+                }
             }
         });
+    }
 
-        // Minimal JS bridge — just setCurrentRoom so notification suppression works
-        WebNotificationInterface notifInterface = new WebNotificationInterface(this);
-        notifInterface.setWebView(webView);
-        webView.addJavascriptInterface(notifInterface, "AndroidNotifications");
+    /**
+     * Navigate to a room using pushState + popstate, same as MainActivity.
+     * Cinny listens for popstate events to handle client-side routing.
+     */
+    private void navigateToRoom(String roomId, String userId) {
+        if (webView == null || roomId == null) return;
+
+        MainActivity.currentRoomId = roomId;
+
+        String safeRoomId = roomId.replace("\\", "\\\\").replace("'", "\\'");
+        String js;
+        if (userId != null && !userId.isEmpty()) {
+            String safeUserId = userId.replace("\\", "\\\\").replace("'", "\\'");
+            js = "(function() {" +
+                "  var path = '/to/' + encodeURIComponent('" + safeUserId + "') + '/' + encodeURIComponent('" + safeRoomId + "') + '/';" +
+                "  window.history.pushState({}, '', path);" +
+                "  window.dispatchEvent(new PopStateEvent('popstate', {state: window.history.state}));" +
+                "})();";
+        } else {
+            js = "(function() {" +
+                "  var path = '/home/' + encodeURIComponent('" + safeRoomId + "') + '/';" +
+                "  window.history.pushState({}, '', path);" +
+                "  window.dispatchEvent(new PopStateEvent('popstate', {state: window.history.state}));" +
+                "})();";
+        }
+        webView.evaluateJavascript(js, null);
     }
 
     private String loadAsset(String filename) {
@@ -108,6 +139,7 @@ public class BubbleActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         MainActivity.isInForeground = false;
+        MainActivity.currentRoomId = null;
         CookieManager.getInstance().flush();
     }
 
