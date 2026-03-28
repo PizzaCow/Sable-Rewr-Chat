@@ -289,8 +289,9 @@ public class MainActivity extends AppCompatActivity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, false);
 
-        WebNotificationInterface notifInterface = new WebNotificationInterface(this);
+        final WebNotificationInterface notifInterface = new WebNotificationInterface(this);
         notifInterface.setWebView(webView);
+        notifInterface.updateUrl(Config.SABLE_URL); // seed initial URL
         webView.addJavascriptInterface(notifInterface, "AndroidNotifications");
 
         webView.setDownloadListener(new DownloadListener() {
@@ -369,6 +370,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                notifInterface.updateUrl(url);
                 if (notificationShimJs != null && !notificationShimJs.isEmpty()) {
                     view.evaluateJavascript(notificationShimJs, null);
                 }

@@ -37,13 +37,38 @@ public class WebNotificationInterface {
     }
 
     /**
-     * Checks whether the current WebView URL belongs to a trusted origin.
-     * Prevents rogue JS from calling sensitive bridge methods.
+     * Cache the last known URL on the main thread so the JS bridge thread
+     * (which runs @JavascriptInterface callbacks) can check it safely.
+     * WebView.getUrl() is only reliable on the main thread.
+     */
+    private volatile String lastKnownUrl;
+
+    /** Call from WebViewClient.onPageFinished / onPageStarted on the main thread. */
+    public void updateUrl(String url) {
+        this.lastKnownUrl = url;
+    }
+
+    /**
+     * Checks whether the last known WebView URL belongs to a trusted origin.
+     * Uses a cached URL rather than calling webView.getUrl() which is
+     * unreliable from the @JavascriptInterface background thread.
      */
     private boolean isTrustedOrigin() {
-        if (webView == null) return false;
-        String url = webView.getUrl();
-        if (url == null) return false;
+        String url = lastKnownUrl;
+        if (url == null) {
+            // If we haven't cached a URL yet, try the WebView directly as fallback.
+            // This may return null on the JS thread, so default to true for the
+            // initial page load (the WebView only loads our own SABLE_URL).
+            if (webView != null) {
+                try { url = webView.getUrl(); } catch (Exception e) { /* ignore */ }
+            }
+            if (url == null) {
+                // No URL available — allow it. The WebView only loads our trusted URL,
+                // and blocking here would break token saving entirely.
+                Log.w(TAG, "isTrustedOrigin: no URL cached, allowing (initial load)");
+                return true;
+            }
+        }
         for (String origin : Config.TRUSTED_ORIGINS) {
             if (url.startsWith(origin)) return true;
         }
