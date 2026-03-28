@@ -321,6 +321,13 @@ public class SyncService extends Service {
 
                 String displayRoomName = (highlightCount > 0) ? "💬 " + roomName : roomName;
                 String evId = event.optString("event_id", null);
+
+                // Deduplicate: if FcmPushService already showed a notification for this event, skip.
+                if (!tokenStore.claimNotification(evId)) {
+                    Log.d(TAG, "Sync notif deduplicated (already shown by FCM): " + evId);
+                    break;
+                }
+
                 notifHelper.showMessage(roomId, displayRoomName, displayName, senderAvatar, roomAvatar,
                     body != null ? body : "New message", isEncrypted, isDm, evId);
                 break; // One notif per room per sync

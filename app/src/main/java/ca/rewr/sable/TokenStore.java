@@ -12,6 +12,7 @@ public class TokenStore {
     private static final String TAG = "TokenStore";
     private static final String PREFS = "sable_session_encrypted";
     private static final String LEGACY_PREFS = "sable_session";
+    private static final String NOTIF_STATE_PREFS = "sable_notif_state";
     private static final String KEY_ACCESS_TOKEN = "access_token";
     private static final String KEY_HOMESERVER = "homeserver";
     private static final String KEY_SINCE = "sync_since";
@@ -20,8 +21,10 @@ public class TokenStore {
     private static final String KEY_FCM_PUSHER_REGISTERED = "fcm_pusher_registered";
 
     private final SharedPreferences prefs;
+    private final Context appContext;
 
     public TokenStore(Context context) {
+        this.appContext = context.getApplicationContext();
         SharedPreferences encrypted = null;
         try {
             String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
@@ -98,5 +101,56 @@ public class TokenStore {
     public boolean isFcmPusherRegistered() { return prefs.getBoolean(KEY_FCM_PUSHER_REGISTERED, false); }
     public void setFcmPusherRegistered(boolean registered) {
         prefs.edit().putBoolean(KEY_FCM_PUSHER_REGISTERED, registered).apply();
+    }
+
+    // ── Notification deduplication ─────────────────────────────────────────────
+    // Shared between FcmPushService and SyncService to prevent double-firing a
+    // notification when both paths see the same Matrix event_id.
+    // Uses plain SharedPreferences (not encrypted) — event IDs are not sensitive,
+    // and EncryptedSharedPreferences can't be safely accessed from concurrent
+    // processes/services on some devices.
+
+    /** Max number of event IDs to remember. LRU-style: oldest dropped first. */
+    private static final int MAX_NOTIFIED_EVENTS = 50;
+    private static final String KEY_NOTIFIED_EVENTS = "notified_event_ids";
+
+    /**
+     * Returns true (and records the event_id) if we should show a notification
+     * for this event. Returns false if we've already shown one for this event_id.
+     * Pass null to always return true (no deduplication possible).
+     */
+    public boolean claimNotification(String eventId) {
+        if (eventId == null || eventId.isEmpty()) return true;
+
+        SharedPreferences statePrefs = appContext.getSharedPreferences(
+            NOTIF_STATE_PREFS, Context.MODE_PRIVATE);
+        String existing = statePrefs.getString(KEY_NOTIFIED_EVENTS, "");
+
+        // Stored as newline-delimited list of event IDs (most recent last)
+        String[] ids = existing.isEmpty() ? new String[0] : existing.split("\n");
+        for (String id : ids) {
+            if (eventId.equals(id)) return false; // already shown
+        }
+
+        // Append and trim to MAX_NOTIFIED_EVENTS
+        StringBuilder sb = new StringBuilder(existing);
+        if (sb.length() > 0) sb.append("\n");
+        sb.append(eventId);
+
+        // Trim from the front if over limit
+        String updated = sb.toString();
+        String[] allIds = updated.split("\n");
+        if (allIds.length > MAX_NOTIFIED_EVENTS) {
+            int dropCount = allIds.length - MAX_NOTIFIED_EVENTS;
+            StringBuilder trimmed = new StringBuilder();
+            for (int i = dropCount; i < allIds.length; i++) {
+                if (trimmed.length() > 0) trimmed.append("\n");
+                trimmed.append(allIds[i]);
+            }
+            updated = trimmed.toString();
+        }
+
+        statePrefs.edit().putString(KEY_NOTIFIED_EVENTS, updated).apply();
+        return true;
     }
 }

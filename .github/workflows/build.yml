@@ -58,15 +58,9 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            ## v1.17 — Material You, Splash Screen & Conversation Bubbles
-            - 🎨 Material You dynamic colors (Android 12+ wallpaper-derived accents)
-            - ⚡ Splash screen — app icon on black, stays until WebView loads (no white flash)
-            - 💬 Conversation bubbles — floating chat heads from notifications (Android 11+)
-            - 🔒 Encrypted token storage (EncryptedSharedPreferences)
-            - 🔒 Removed google-services.json from repo (CI secret injection)
-            - 🔒 Origin validation on JS bridge
-            - 🔧 Fixed WebRTC permission race condition
-            - 🔧 R8/ProGuard enabled
-            - 🔧 Centralized Config class
+            ## v1.18 — Fix duplicate, delayed & missing notifications
+            - 🔔 Fixed duplicate notifications — FCM and SyncService were both showing a notification for the same message; added event_id deduplication so whichever path fires first wins and the other skips
+            - 🔔 Fixed delayed notifications — SyncService long-poll is now a true fallback only (FCM is primary); dedup prevents the fallback from clobbering the fast FCM notification
+            - 🔔 Fixed missing notifications in some cases — notification stacking no longer double-appends messages to MessagingStyle
           prerelease: false
           files: rewr-chat.apk

@@ -49,6 +49,12 @@ public class FcmPushService extends FirebaseMessagingService {
             return;
         }
 
+        // Deduplicate: if SyncService already showed a notification for this event, skip.
+        if (!ts.claimNotification(eventId)) {
+            Log.d(TAG, "FCM push deduplicated (already shown by SyncService): " + eventId);
+            return;
+        }
+
         // Skip own messages
         String ownUserId = ts.getOwnUserId();
         if (sender != null && !ownUserId.isEmpty() && sender.equals(ownUserId)) return;
