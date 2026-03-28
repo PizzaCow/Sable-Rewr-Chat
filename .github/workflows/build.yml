@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, fixes/security-and-stability ]
   workflow_dispatch:
 
 permissions:
@@ -58,14 +58,15 @@ jobs:
           tag_name: ${{ steps.version.outputs.name }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            ## v1.16 — Security & Stability
-            - Encrypted token storage (EncryptedSharedPreferences)
-            - Removed google-services.json from repo (now injected via CI secret)
-            - Origin validation on JS bridge saveSession()
-            - Fixed WebRTC permission race condition
-            - Enabled R8/ProGuard minification + shrinkResources
-            - Disabled third-party cookies
-            - Centralized all hardcoded URLs into Config class
-            - Extracted duplicate filename parsing helper
+            ## v1.17 — Material You, Splash Screen & Conversation Bubbles
+            - 🎨 Material You dynamic colors (Android 12+ wallpaper-derived accents)
+            - ⚡ Splash screen — app icon on black, stays until WebView loads (no white flash)
+            - 💬 Conversation bubbles — floating chat heads from notifications (Android 11+)
+            - 🔒 Encrypted token storage (EncryptedSharedPreferences)
+            - 🔒 Removed google-services.json from repo (CI secret injection)
+            - 🔒 Origin validation on JS bridge
+            - 🔧 Fixed WebRTC permission race condition
+            - 🔧 R8/ProGuard enabled
+            - 🔧 Centralized Config class
           prerelease: false
           files: rewr-chat.apk
