@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 12+ base theme with Material You dynamic colors -->
-    <style name="Theme.Sable" parent="Theme.Material3.DynamicColors.Dark.NoActionBar">
+    <!-- Android 12+ — same base theme; DynamicColors is applied at runtime
+         via SableApplication.onCreate(). No special parent needed. -->
+    <style name="Theme.Sable" parent="Theme.Material3.Dark.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/black</item>
         <item name="android:navigationBarColor">@android:color/black</item>
         <item name="windowActionModeOverlay">true</item>
     </style>
 
-    <!-- Splash screen with Android 12+ native splash API -->
+    <!-- Splash screen with Android 12 native splash API -->
     <style name="Theme.Sable.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@android:color/black</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
